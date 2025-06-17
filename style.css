@@ -1,0 +1,103 @@
+body {
+    background: #2D0636; /* Violet profond */
+    color: #fff;
+    font-family: sans-serif;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#main-layout {
+    display: flex;
+    align-items: flex-start;
+}
+
+#game-container {
+    margin-top: 20px;
+    display: grid;
+    grid-template-columns: repeat(22, 24px);
+    grid-template-rows: repeat(22, 24px);
+    gap: 2px;
+    background: #E0E0E0; /* Gris clair pour la grille */
+    padding: 10px;
+    border-radius: 14px;
+    box-shadow: 0 0 24px #4F0341aa;
+}
+
+.cell {
+    width: 24px;
+    height: 24px;
+    background: #F2F2F2; /* Gris encore plus clair pour les cases */
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+
+.title {
+    color: #7FFFD4;
+    text-shadow: 0 0 10px #FF69B4, 0 0 20px #FF69B4, 0 0 30px #FF69B4;
+}
+
+.player {
+    background: #7FFFD4; /* Vert d'eau */
+}
+
+.wall {
+    background: #888; /* Gris foncé pour les murs */
+}
+
+#controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    margin: 16px 0;
+}
+
+.arrow-btn {
+    font-size: 2rem;
+    padding: 10px 16px;
+    background: #222;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    box-shadow: 0 0 6px #888;
+    transition: background 0.2s;
+}
+
+    .arrow-btn:hover {
+        background: #7FFFD4;
+        color: #2D0636;
+    }
+
+.crash {
+    position: relative;
+}
+
+.crash-x {
+    color: #000;
+    font-size: 1.5rem;
+    font-weight: bold;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+
+side-panel {
+    display: inline-block;
+    vertical-align: top;
+    margin-left: 32px;
+    min-width: 40px;
+}
+
+#action-gauge {
+    font-family: monospace;
+    font-size: 1.2em;
+    margin-top: 40px;
+    text-align: center;
+}
