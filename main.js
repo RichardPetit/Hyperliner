@@ -49,14 +49,14 @@ function updateGridState() {
 }
 
 function renderGrid() {
-    // Parcours toutes les cases et met à jour le DOM
     for (let y = 0; y < gridSize; y++) {
         for (let x = 0; x < gridSize; x++) {
             const cell = document.querySelector(`.cell[data-x="${x}"][data-y="${y}"]`);
             if (!cell) continue;
 
             // Reset classes et styles
-            cell.className = 'cell';
+            // à voir
+            //cell.className = 'cell';
             cell.style.background = '';
             cell.style.boxShadow = '';
 
@@ -80,28 +80,12 @@ function renderGrid() {
             } else if (cellState.type === 'crash') {
                 cell.classList.add('crash');
                 cell.style.background = '#e53935'; // rouge vif
-                cell.innerHTML = '<span class="crash-x">✖</span>'; // croix blanche
+                cell.innerHTML = '<span class="crash-x">✖</span>';
             }
         }
     }
 }
 
-
-// Tableau des joueurs : position x/y et direction initiale
-//const players = [
-//    // Bas (vers le haut)
-//    { x: 7, y: 17, dir: 'up', color: "#7FFFD4"/*, shadowColor: "#FF6F91"*/ },   // Aqua + rose
-//    { x: 14, y: 17, dir: 'up', color: "#FF69B4"/*, shadowColor: "#00FFD0" */},  // Rose + turquoise
-//    // Haut (vers le bas)
-//    { x: 7, y: 4, dir: 'down', color: "#FFD700"/*, shadowColor: "#00BFFF"*/ },  // Jaune + bleu
-//    { x: 14, y: 4, dir: 'down', color: "#00BFFF"/*, shadowColor: "#FFD700"*/ }, // Bleu + jaune
-//    // Gauche (vers la droite)
-//    { x: 4, y: 7, dir: 'right', color: "#FF6347"/*, shadowColor: "#32CD32"*/ }, // Rouge + vert
-//    { x: 4, y: 14, dir: 'right', color: "#32CD32"/*, shadowColor: "#FF6347"*/ },// Vert + rouge
-//    // Droite (vers la gauche)
-//    { x: 17, y: 7, dir: 'left', color: "#FFA500"/*, shadowColor: "#007BFF"*/ }, // Orange + bleu foncé
-//    { x: 17, y: 14, dir: 'left', color: "#BA55D3"/*, shadowColor: "#FFD700"*/ } // Violet + jaune
-//];
 const players = [
     // Bas (vers le haut)
     {
@@ -114,7 +98,7 @@ const players = [
         alive: true,
         score: 0,
         vehicleId: 'snypase',
-        actionGauge: 0,             // nombre d’actions stockées actuellement
+        actionGauge: 0,       // nombre d’actions de départ
         lastActionTime: Date.now()
     },
     {
@@ -127,7 +111,7 @@ const players = [
         alive: true,
         score: 0,
         vehicleId: 'psionide',
-        actionGauge: 0,             // nombre d’actions stockées actuellement
+        actionGauge: 0, 
         lastActionTime: Date.now()
     },
     // Haut (vers le bas)
@@ -141,7 +125,7 @@ const players = [
         alive: true,
         score: 0,
         vehicleId: 'psionide',
-        actionGauge: 0,             // nombre d’actions stockées actuellement
+        actionGauge: 0,     
         lastActionTime: Date.now()
     },
     {
@@ -154,7 +138,7 @@ const players = [
         alive: true,
         score: 0,
         vehicleId: 'psionide',
-        actionGauge: 0,             // nombre d’actions stockées actuellement
+        actionGauge: 0,  
         lastActionTime: Date.now()
     },
     // Gauche (vers la droite)
@@ -168,7 +152,7 @@ const players = [
         alive: true,
         score: 0,
         vehicleId: 'psionide',
-        actionGauge: 0,             // nombre d’actions stockées actuellement
+        actionGauge: 0,  
         lastActionTime: Date.now()
     },
     {
@@ -180,8 +164,8 @@ const players = [
         color: "#32CD32",
         alive: true,
         score: 0,
-        vehicleId: 'psionide',
-        actionGauge: 0,             // nombre d’actions stockées actuellement
+        vehicleId: 'banshee',
+        actionGauge: 0, 
         lastActionTime: Date.now()
     },
     // Droite (vers la gauche)
@@ -195,7 +179,7 @@ const players = [
         alive: true,
         score: 0,
         vehicleId: 'psionide',
-        actionGauge: 0,             // nombre d’actions stockées actuellement
+        actionGauge: 0,   
         lastActionTime: Date.now()
 
     },
@@ -209,32 +193,17 @@ const players = [
         alive: true,
         score: 0,
         vehicleId: 'psionide',
-        actionGauge: 0,             // nombre d’actions stockées actuellement
+        actionGauge: 0, 
         lastActionTime: Date.now()
     },
 ];
-//players.forEach(player => {
-//    const vehicle = VEHICLES[player.vehicleId];
-//    // Pour chaque propriété de bonus/pouvoir du véhicule, on la copie sur le joueur
-//    player.shieldActive = vehicle.shield ? true : false;
-//    player.teleporter = vehicle.teleporter ? true : false;
-//    player.jammer = vehicle.jammer ? true : false;
-//    player.mine = vehicle.mine ? true : false;
-//    player.boost = vehicle.boost ? true : false;
-//    player.aerobrake = vehicle.aerobrake ? true : false;
-//    player.missile = vehicle.missile ? true : false;
-//});
-
 
 
 
 
 
 /*PARTIE VEHICULES ET BONUS*/
-//players.forEach(player => {
-//    // Si le véhicule a un bouclier, shieldActive est true, sinon false
-//    player.shieldActive = VEHICLES[player.vehicleId].shield ? true : false;
-//});
+
 
 class Vehicle {
     constructor(options) {
@@ -263,6 +232,9 @@ const VEHICLES = {
         latenceTourner: 4,
         shield: false,
         missile: true,
+        teleporter: true,
+        boost: true,
+        aerobrake: true,
     }),
     psionide: new Vehicle({
         id: 'Psio',
@@ -272,13 +244,16 @@ const VEHICLES = {
         latenceTourner: 2,
         shield: true,
         missile: false,
+        jammer: true,
+        aerobrake: true,
+        boost: true,
     }),
     bison: new Vehicle({
         id: 'Bis',
         nom: 'Bison',
-        maxActionGauge: 8,
-        rechargeTime: 1200,
-        latenceTourner: 2,
+        maxActionGauge: 9,
+        rechargeTime: 100,
+        latenceTourner: 3,
         shield: true,
         missile: false,
     }),
@@ -304,10 +279,13 @@ const VEHICLES = {
         id: 'Ban',
         nom: 'Banshee',
         maxActionGauge: 8,
-        rechargeTime: 1200,
+        rechargeTime: 1000,
         latenceTourner: 2,
-        shield: true,
+        shield: false,
         missile: false,
+        teleporter: true,
+        boost: true,
+        aerobrake: true,
     }),
     mighty: new Vehicle({
         id: 'Mig',
@@ -361,7 +339,7 @@ players.forEach(player => {
     if (playerCell) {
         playerCell.classList.add('player');
         playerCell.style.background = player.color;
-        playerCell.style.color = player.color; // Pour currentColor
+        playerCell.style.color = player.color;
         playerCell.style.boxShadow = `
       0 0 8px #fff,
       0 0 16px ${player.shadowColor},
@@ -415,6 +393,7 @@ players.forEach(player => {
 });
 // Supposons que tu veux contrôler le premier joueur (index 0)
 showDirectionControls(players[0]);
+showPowerControls(players[0]);
 
 function showDirectionControls(player) {
     const controls = document.getElementById('controls');
@@ -458,7 +437,20 @@ function isDirectionSafe(player, direction) {
     if (direction === 'right') nextX = (player.x + 1) % gridSize;
 
     // Vérifier si la prochaine case est sûre (vide)
-    return grid[nextY][nextX].type === "empty";
+    const isSafe = grid[nextY][nextX].type === "empty";
+
+    // Vérifier si la direction proposée ne fait pas reculer le joueur dans son propre mur
+    if (!isSafe) {
+        // Vérifier si la direction est opposée à la direction actuelle
+        if ((direction === 'up' && player.dir === 'down') ||
+            (direction === 'down' && player.dir === 'up') ||
+            (direction === 'left' && player.dir === 'right') ||
+            (direction === 'right' && player.dir === 'left')) {
+            return false;
+        }
+    }
+
+    return isSafe;
 }
 
 function getArrowSymbol(dir) {
@@ -472,46 +464,6 @@ function getArrowSymbol(dir) {
 }
 
 
-//function movePlayer(player) {
-//    // Calcul de la nouvelle position avec wrap-around
-//    let nextX = player.x, nextY = player.y;
-//    if (player.dir === 'up') nextY = (player.y - 1 + gridSize) % gridSize;
-//    if (player.dir === 'down') nextY = (player.y + 1) % gridSize;
-//    if (player.dir === 'left') nextX = (player.x - 1 + gridSize) % gridSize;
-//    if (player.dir === 'right') nextX = (player.x + 1) % gridSize;
-
-//    // Si collision
-//    if (grid[nextY][nextX].type !== "empty") {
-//        // Transforme la case quittée en mur AVANT de traiter la collision
-//        grid[player.y][player.x] = { type: "wall", playerId: player.id };
-
-//        // Si c'est un autre joueur, on l'élimine aussi
-//        if (grid[nextY][nextX].type === "player") {
-//            const otherId = grid[nextY][nextX].playerId;
-//            players[otherId].alive = false;
-//            player.score++;
-//        }
-//        // Marque la case d'arrivée comme "crash"
-//        grid[nextY][nextX] = { type: "crash", playerId: player.id };
-//        player.alive = false;
-//        renderGrid();
-//        setTimeout(() => {
-//            alert("Le joueur est éliminé !");
-//        }, 100);
-//        return;
-//    }
-
-//    // Si pas de collision, la case quittée devient un mur
-//    grid[player.y][player.x] = { type: "wall", playerId: player.id };
-
-//    // Déplacement du joueur
-//    player.x = nextX;
-//    player.y = nextY;
-//    grid[player.y][player.x] = { type: "player", playerId: player.id };
-
-//    // Gère la latence
-//    if (player.latence > 0) player.latence--;
-//}
 function movePlayer(player) {
     // Calculer la nouvelle position avec wrap-around
     let nextX = player.x;
@@ -558,9 +510,6 @@ function movePlayer(player) {
     if (player.latence > 0) player.latence--;
 }
 
-
-
-
 function rechargeActions() {
     const now = Date.now();
     players.forEach(player => {
@@ -597,12 +546,6 @@ function handleDirectionClick(direction) {
 
     if (player.actionGauge <= 0) return;
 
-    // On ne décrémente la latence que si elle est active et qu'on va tout droit
-    if (player.latence > 0 && direction === player.dir) {
-        player.latence--;
-    }
-
-    // Après décrémentation, si latence > 0, on ne peut que continuer tout droit
     if (player.latence > 0 && direction !== player.dir) return;
 
     // Si on tourne, on applique la latence du véhicule
@@ -642,11 +585,10 @@ function updateActionDisplay(player) {
     gauge.innerHTML = html;
 }
 
+function showPowerControls(player) {
+    const powerControls = document.getElementById('power-controls');
+    powerControls.innerHTML = ''; // Efface les anciens contrôles de pouvoir
 
-
-function showPowers(player) {
-    const powersDiv = document.getElementById('powers');
-    powersDiv.innerHTML = ''; // Vide les anciens pouvoirs
     const vehicle = VEHICLES[player.vehicleId];
 
     // Liste des pouvoirs à afficher
@@ -664,14 +606,33 @@ function showPowers(player) {
         if (vehicle[power.key]) {
             const btn = document.createElement('button');
             btn.textContent = power.label;
-            btn.onclick = () => activatePower(player, power.key);
-            powersDiv.appendChild(btn);
+            btn.onclick = () => {
+                activatePower(player, power.key);
+                showPowerControls(player); // Mettre à jour les boutons après activation
+            };
+
+            // Vérifier si le pouvoir est disponible
+            if (!vehicle[power.key]) {
+                btn.disabled = true;
+                btn.classList.add('disabled-power');
+            }
+
+            powerControls.appendChild(btn);
         }
     });
 }
 
 
 function activatePower(player, powerKey) {
+    const vehicle = VEHICLES[player.vehicleId];
+
+    // Vérifier si le pouvoir est disponible
+    if (!vehicle[powerKey]) {
+        console.log("Ce pouvoir n'est pas disponible.");
+        return;
+    }
+
+    // Activer le pouvoir
     switch (powerKey) {
         case 'shield':
             activateShield(player);
@@ -695,39 +656,17 @@ function activatePower(player, powerKey) {
             activateMissile(player);
             break;
     }
+
+    // Mettre à jour l'attribut du véhicule pour indiquer que le pouvoir a été utilisé
+    vehicle[powerKey] = false;
+
+    // Mettre à jour l'affichage
     renderGrid();
     updateActionDisplay(player);
-    showPowers(player);
+    //showPowerControls(player);
 }
 
-function activatePower(player, powerKey) {
-    switch (powerKey) {
-        case 'shield':
-            activateShield(player);
-            break;
-        case 'teleporter':
-            activateTeleporter(player);
-            break;
-        case 'jammer':
-            activateJammer(player);
-            break;
-        case 'mine':
-            activateMine(player);
-            break;
-        case 'boost':
-            activateBoost(player);
-            break;
-        case 'aerobrake':
-            activateAerobrake(player);
-            break;
-        case 'missile':
-            activateMissile(player);
-            break;
-    }
-    renderGrid();
-    updateActionDisplay(player);
-    showPowers(player);
-}
+
 
 //Bouclier temporaire
 //function activateShield(player) {
@@ -746,38 +685,131 @@ function activateAerobrake(player) {
     player.latence = 0;
     player.actionGauge = 0;
     updateActionDisplay(player);
+    showDirectionControls(player); // Recalculer les contrôles de direction
 }
 
+//function activateMissile(player) {
+//    let x = player.x;
+//    let y = player.y;
+//    let dx = 0;
+//    let dy = 0;
+
+//    // Déterminer la direction du missile
+//    if (player.dir === 'up') dy = -1;
+//    if (player.dir === 'down') dy = 1;
+//    if (player.dir === 'left') dx = -1;
+//    if (player.dir === 'right') dx = 1;
+
+//    // Déterminer la classe CSS en fonction de la direction
+//    const trailClass = (dx !== 0) ? 'missile-trail-horizontal' : 'missile-trail-vertical';
+
+//    // Parcourir jusqu'à 4 cases dans la direction du missile
+//    for (let i = 0; i < 4; i++) {
+//        x = (x + dx + gridSize) % gridSize;
+//        y = (y + dy + gridSize) % gridSize;
+
+//        // Appliquer un effet visuel temporaire
+//        const cell = document.querySelector(`.cell[data-x="${x}"][data-y="${y}"]`);
+//        if (cell) {
+//            cell.classList.add(trailClass);
+
+//            // Supprimer la classe après un court délai pour l'effet visuel
+//            setTimeout(() => {
+//                cell.classList.remove(trailClass);
+//            }, 300);
+//        }
+
+//        // Vérifier si la case contient un mur ou un joueur
+//        if (grid[y][x].type === 'wall' || grid[y][x].type === 'player') {
+//            const target = grid[y][x];
+//            if (target.type === 'player') {
+//                const targetPlayer = players[target.playerId];
+//                if (!targetPlayer.shieldActive) {
+//                    targetPlayer.alive = false;
+//                    setTimeout(() => {
+//                        alert(`Le joueur ${targetPlayer.id} est éliminé !`);
+//                    }, 100);
+//                } else {
+//                    console.log(`Le joueur ${targetPlayer.id} est protégé par un bouclier !`);
+//                }
+//            }
+//            // Détruire la case rencontrée si c'est un mur
+//            if (target.type === 'wall') {
+//                grid[y][x] = { type: "empty", playerId: null };
+//                if (cell) {
+//                    cell.className = 'cell';
+//                    cell.style.background = '#F2F2F2';
+//                    cell.style.boxShadow = '';
+//                }
+//            }
+//            break;
+//        }
+//    }
+//    renderGrid(); // Mettre à jour l'affichage de la grille
+//}
+
 function activateMissile(player) {
-    // Tire un missile dans la direction du joueur
-    let x = player.x, y = player.y;
-    let dx = 0, dy = 0;
+    let x = player.x;
+    let y = player.y;
+    let dx = 0;
+    let dy = 0;
+
+    // Déterminer la direction du missile
     if (player.dir === 'up') dy = -1;
     if (player.dir === 'down') dy = 1;
     if (player.dir === 'left') dx = -1;
     if (player.dir === 'right') dx = 1;
 
-    // Parcours jusqu'à toucher un mur ou un autre joueur
-    //while (true) {
-    //portée de 4 cases
+    // Parcourir jusqu'à 4 cases dans la direction du missile
     for (let i = 0; i < 4; i++) {
-        x += dx;
-        y += dy;
-        if (x < 0 || x >= gridSize || y < 0 || y >= gridSize) break;
+        x = (x + dx + gridSize) % gridSize;
+        y = (y + dy + gridSize) % gridSize;
+
+        // Appliquer un effet visuel temporaire
+        const cell = document.querySelector(`.cell[data-x="${x}"][data-y="${y}"]`);
+        if (cell) {
+            const trailClass = (dx !== 0) ? 'missile-trail-horizontal' : 'missile-trail-vertical';
+            cell.classList.add(trailClass);
+            setTimeout(() => {
+                cell.classList.remove(trailClass);
+            }, 300);
+        }
+
+        // Vérifier si la case contient un mur ou un joueur
         if (grid[y][x].type === 'wall' || grid[y][x].type === 'player') {
-            //// Explosion ou effet
-            //grid[y][x] = { type: "crash", playerId: player.id };
-            //break;
-            //}
-            if (grid[y][x].type === 'player') {
-                const otherId = grid[y][x].playerId;
-                players[otherId].alive = false;
+            const target = grid[y][x];
+            if (target.type === 'player') {
+                const targetPlayer = players[target.playerId];
+                if (!targetPlayer.shieldActive) {
+                    targetPlayer.alive = false;
+                    // Retirer le joueur de la grille
+                    grid[y][x] = { type: "empty", playerId: null };
+                    if (cell) {
+                        cell.className = 'cell';
+                        cell.style.background = '#F2F2F2';
+                        cell.style.boxShadow = '';
+                    }
+                    setTimeout(() => {
+                        alert(`Le joueur ${targetPlayer.id} est éliminé !`);
+                    }, 100);
+                } else {
+                    console.log(`Le joueur ${targetPlayer.id} est protégé par un bouclier !`);
+                }
+            } else if (target.type === 'wall') {
+                // Détruire le mur
+                grid[y][x] = { type: "empty", playerId: null };
+                if (cell) {
+                    cell.className = 'cell';
+                    cell.style.background = '#F2F2F2';
+                    cell.style.boxShadow = '';
+                }
             }
-            grid[y][x] = { type: "empty", playerId: null };
+            break;
         }
     }
-    renderGrid();
+    renderGrid(); // Mettre à jour l'affichage de la grille
 }
+
 
 function activateTeleporter(player) {
     // Trouver une position aléatoire vide sur la grille
@@ -787,12 +819,27 @@ function activateTeleporter(player) {
         newY = Math.floor(Math.random() * gridSize);
     } while (grid[newY][newX].type !== "empty");
 
-    // Déplacer le joueur à la nouvelle position
+    // Réinitialiser l'ancien emplacement du joueur
+    const oldCell = document.querySelector(`.cell[data-x="${player.x}"][data-y="${player.y}"]`);
+    if (oldCell) {
+        oldCell.className = 'cell';
+        oldCell.style.background = '#F2F2F2';
+        oldCell.style.boxShadow = '';
+    }
+
+    // Mettre à jour la grille pour l'ancien emplacement
     grid[player.y][player.x] = { type: "empty", playerId: null };
+
+    // Déplacer le joueur à la nouvelle position
     player.x = newX;
     player.y = newY;
     grid[player.y][player.x] = { type: "player", playerId: player.id };
+
+    // Mettre à jour les contrôles de direction
+    showDirectionControls(player);
+
 }
+
 
 function activateJammer(player) {
     let closestPlayer = null;
@@ -816,18 +863,15 @@ function activateJammer(player) {
 function activateBoost(player) {
     const vehicle = VEHICLES[player.vehicleId];
     const maxActionGauge = vehicle.maxActionGauge;
-    const boostValue = 3; // Le boost donne 3 actions
+    const boostValue = 3; 
 
     if (player.actionGauge === 0) {
-        // Si la jauge est vide, augmenter de la valeur du boost
         player.actionGauge += boostValue;
     } else if (player.actionGauge < maxActionGauge) {
-        // Si la jauge n'est pas pleine, augmenter de la valeur du boost et gérer l'excédent
         const newGauge = player.actionGauge + boostValue;
         if (newGauge > maxActionGauge) {
             const excess = newGauge - maxActionGauge;
             player.actionGauge = maxActionGauge;
-            // Avancer automatiquement du nombre de cases correspondant à l'excédent
             for (let i = 0; i < excess; i++) {
                 movePlayer(player);
             }
@@ -835,7 +879,6 @@ function activateBoost(player) {
             player.actionGauge = newGauge;
         }
     } else {
-        // Si la jauge est pleine, avancer automatiquement du nombre de cases correspondant au boost
         for (let i = 0; i < boostValue; i++) {
             movePlayer(player);
         }

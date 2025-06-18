@@ -27,6 +27,7 @@ body {
 }
 
 .cell {
+    position: relative;
     width: 24px;
     height: 24px;
     background: #F2F2F2; /* Gris encore plus clair pour les cases */
@@ -101,3 +102,75 @@ side-panel {
     margin-top: 40px;
     text-align: center;
 }
+
+#power-controls {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+    #power-controls button {
+        padding: 10px 15px;
+        background-color: #4CAF50; 
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+    }
+
+        #power-controls button:hover {
+            background-color: #45a049;
+        }
+        #power-controls button:active {
+            background-color: #3e8e41;
+        }
+
+.disabled-power {
+    background-color: #cccccc; /* Gris */
+    color: #666666; /* Gris foncé */
+    cursor: not-allowed;
+}
+
+
+.missile-trail {
+    position: relative;
+}
+
+  /*  .missile-trail::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background-color: red;
+        transform: translateY(-50%);
+        z-index: 2;
+    }*/
+/* Trait horizontal pour le missile */
+.missile-trail-horizontal::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background-color: red;
+    transform: translateY(-50%);
+}
+
+/* Trait vertical pour le missile */
+.missile-trail-vertical::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: 2px;
+    height: 100%;
+    background-color: red;
+    transform: translateX(-50%);
+}
+
+
