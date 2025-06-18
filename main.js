@@ -213,9 +213,28 @@ const players = [
         lastActionTime: Date.now()
     },
 ];
+//players.forEach(player => {
+//    const vehicle = VEHICLES[player.vehicleId];
+//    // Pour chaque propriété de bonus/pouvoir du véhicule, on la copie sur le joueur
+//    player.shieldActive = vehicle.shield ? true : false;
+//    player.teleporter = vehicle.teleporter ? true : false;
+//    player.jammer = vehicle.jammer ? true : false;
+//    player.mine = vehicle.mine ? true : false;
+//    player.boost = vehicle.boost ? true : false;
+//    player.aerobrake = vehicle.aerobrake ? true : false;
+//    player.missile = vehicle.missile ? true : false;
+//});
+
+
+
+
 
 
 /*PARTIE VEHICULES ET BONUS*/
+//players.forEach(player => {
+//    // Si le véhicule a un bouclier, shieldActive est true, sinon false
+//    player.shieldActive = VEHICLES[player.vehicleId].shield ? true : false;
+//});
 
 class Vehicle {
     constructor(options) {
@@ -312,6 +331,20 @@ const VEHICLES = {
 //const vehicle = VEHICLES[player.vehicleId];
 
 
+const bonusKeys = [
+    'shield', 'teleporter', 'jammer', 'mine', 'boost', 'aerobrake', 'missile'
+];
+
+players.forEach(player => {
+    const vehicle = VEHICLES[player.vehicleId];
+    bonusKeys.forEach(key => {
+        // Possession du pouvoir
+        player[key] = !!vehicle[key];
+        // Etat actif du pouvoir (initialisé à true si possédé, sinon false)
+        player[`${key}Active`] = !!vehicle[key];
+    });
+});
+
 /* fin partie véhicules et bonus */
 
 
@@ -385,30 +418,47 @@ showDirectionControls(players[0]);
 
 function showDirectionControls(player) {
     const controls = document.getElementById('controls');
-    controls.innerHTML = ''; // Vide les anciens contrôles
+    controls.innerHTML = ''; // Efface les anciens contrôles
 
-    // Détermine les directions possibles
-    const possibleDirections = [];
+    // Directions possibles basées sur la direction actuelle
+    let possibleDirections = [];
     if (player.latence > 0) {
         // Seule la direction actuelle est possible
         possibleDirections.push(player.dir);
     } else {
         // Peut tourner à gauche, à droite, ou continuer tout droit
         if (player.dir === 'up' || player.dir === 'down') {
-            possibleDirections.push('left', player.dir, 'right');
+            possibleDirections = ['left', player.dir, 'right'];
         } else {
-            possibleDirections.push('up', player.dir, 'down');
+            possibleDirections = ['up', player.dir, 'down'];
         }
     }
 
-    // Pour chaque direction possible, crée un bouton/flèche
-    possibleDirections.forEach(direction => {
+    // Filtrer les directions sûres
+    const safeDirections = possibleDirections.filter(dir => isDirectionSafe(player, dir));
+
+    // Créer un bouton pour chaque direction sûre
+    safeDirections.forEach(direction => {
         const btn = document.createElement('button');
         btn.className = 'arrow-btn arrow-' + direction;
-        btn.innerHTML = getArrowSymbol(direction); // Fonction à créer pour le symbole
+        btn.innerHTML = getArrowSymbol(direction);
         btn.onclick = () => handleDirectionClick(direction);
         controls.appendChild(btn);
     });
+}
+
+function isDirectionSafe(player, direction) {
+    let nextX = player.x;
+    let nextY = player.y;
+
+    // Calculer la prochaine position en fonction de la direction
+    if (direction === 'up') nextY = (player.y - 1 + gridSize) % gridSize;
+    if (direction === 'down') nextY = (player.y + 1) % gridSize;
+    if (direction === 'left') nextX = (player.x - 1 + gridSize) % gridSize;
+    if (direction === 'right') nextX = (player.x + 1) % gridSize;
+
+    // Vérifier si la prochaine case est sûre (vide)
+    return grid[nextY][nextX].type === "empty";
 }
 
 function getArrowSymbol(dir) {
@@ -422,83 +472,95 @@ function getArrowSymbol(dir) {
 }
 
 
-//function handleDirectionClick(direction) {
-//    // Récupère le joueur actif (par exemple le premier joueur pour commencer)
-//    let player = players[0]; // À adapter si tu as une gestion de tour
+//function movePlayer(player) {
+//    // Calcul de la nouvelle position avec wrap-around
+//    let nextX = player.x, nextY = player.y;
+//    if (player.dir === 'up') nextY = (player.y - 1 + gridSize) % gridSize;
+//    if (player.dir === 'down') nextY = (player.y + 1) % gridSize;
+//    if (player.dir === 'left') nextX = (player.x - 1 + gridSize) % gridSize;
+//    if (player.dir === 'right') nextX = (player.x + 1) % gridSize;
 
-//    // Si latence > 0, on ne peut pas changer de direction
-//    if (player.latence > 0 && direction !== player.dir) return;
+//    // Si collision
+//    if (grid[nextY][nextX].type !== "empty") {
+//        // Transforme la case quittée en mur AVANT de traiter la collision
+//        grid[player.y][player.x] = { type: "wall", playerId: player.id };
 
-//    // Change la direction si c'est permis
-//    if (direction !== player.dir) {
-//        player.dir = direction;
-//        player.latence = 3; // Par exemple, 3 tours de latence après un virage
+//        // Si c'est un autre joueur, on l'élimine aussi
+//        if (grid[nextY][nextX].type === "player") {
+//            const otherId = grid[nextY][nextX].playerId;
+//            players[otherId].alive = false;
+//            player.score++;
+//        }
+//        // Marque la case d'arrivée comme "crash"
+//        grid[nextY][nextX] = { type: "crash", playerId: player.id };
+//        player.alive = false;
+//        renderGrid();
+//        setTimeout(() => {
+//            alert("Le joueur est éliminé !");
+//        }, 100);
+//        return;
 //    }
 
-//    // Déplace le joueur
-//    movePlayer(player);
+//    // Si pas de collision, la case quittée devient un mur
+//    grid[player.y][player.x] = { type: "wall", playerId: player.id };
 
-//    // Mets à jour l'affichage
-//    //updateGridState();
-//    renderGrid();
-//    showDirectionControls(player);
+//    // Déplacement du joueur
+//    player.x = nextX;
+//    player.y = nextY;
+//    grid[player.y][player.x] = { type: "player", playerId: player.id };
+
+//    // Gère la latence
+//    if (player.latence > 0) player.latence--;
 //}
-
 function movePlayer(player) {
-    // Calcul de la nouvelle position avec wrap-around
-    let nextX = player.x, nextY = player.y;
+    // Calculer la nouvelle position avec wrap-around
+    let nextX = player.x;
+    let nextY = player.y;
     if (player.dir === 'up') nextY = (player.y - 1 + gridSize) % gridSize;
     if (player.dir === 'down') nextY = (player.y + 1) % gridSize;
     if (player.dir === 'left') nextX = (player.x - 1 + gridSize) % gridSize;
     if (player.dir === 'right') nextX = (player.x + 1) % gridSize;
 
-    // Si collision
+    // Vérifier les collisions
     if (grid[nextY][nextX].type !== "empty") {
-        // Transforme la case quittée en mur AVANT de traiter la collision
-        grid[player.y][player.x] = { type: "wall", playerId: player.id };
+        // Si collision avec un mur, un joueur ou une case de crash
+        if (grid[nextY][nextX].type === "wall" || grid[nextY][nextX].type === "player" || grid[nextY][nextX].type === "crash") {
+            // Marquer la case actuelle comme un mur
+            grid[player.y][player.x] = { type: "wall", playerId: player.id };
 
-        // Si c'est un autre joueur, on l'élimine aussi
-        if (grid[nextY][nextX].type === "player") {
-            const otherId = grid[nextY][nextX].playerId;
-            players[otherId].alive = false;
-            player.score++;
+            // Si collision avec un autre joueur, éliminer cet autre joueur
+            if (grid[nextY][nextX].type === "player") {
+                const otherPlayerId = grid[nextY][nextX].playerId;
+                players[otherPlayerId].alive = false;
+            }
+
+            // Marquer la case de collision comme un crash et éliminer le joueur actuel
+            grid[nextY][nextX] = { type: "crash", playerId: player.id };
+            player.alive = false;
+
+            renderGrid();
+            setTimeout(() => {
+                alert("Le joueur est éliminé !");
+            }, 100);
+            return;
         }
-        // Marque la case d'arrivée comme "crash"
-        grid[nextY][nextX] = { type: "crash", playerId: player.id };
-        player.alive = false;
-        renderGrid();
-        setTimeout(() => {
-            alert("Le joueur est éliminé !");
-        }, 100);
-        return;
     }
 
     // Si pas de collision, la case quittée devient un mur
     grid[player.y][player.x] = { type: "wall", playerId: player.id };
 
-    // Déplacement du joueur
+    // Déplacer le joueur
     player.x = nextX;
     player.y = nextY;
     grid[player.y][player.x] = { type: "player", playerId: player.id };
 
-    // Gère la latence
+    // Gérer la latence
     if (player.latence > 0) player.latence--;
 }
 
-//function rechargeActions() {
-//    const now = Date.now();
-//    // Ici, choisis le joueur à afficher (par exemple le joueur actif)
-//    const player = players[0]; // ou index du joueur courant
-//    const vehicle = VEHICLES[player.vehicleId];
 
-//    if (!player.alive) return;
-//    if (player.actionGauge < vehicle.maxActionGauge &&
-//        now - player.lastActionTime >= vehicle.rechargeTime) {
-//        player.actionGauge++;
-//        player.lastActionTime = now;
-//        updateActionDisplay(player); // <-- mise à jour immédiate
-//    }
-//}
+
+
 function rechargeActions() {
     const now = Date.now();
     players.forEach(player => {
@@ -582,12 +644,247 @@ function updateActionDisplay(player) {
 
 
 
+function showPowers(player) {
+    const powersDiv = document.getElementById('powers');
+    powersDiv.innerHTML = ''; // Vide les anciens pouvoirs
+    const vehicle = VEHICLES[player.vehicleId];
+
+    // Liste des pouvoirs à afficher
+    const powersList = [
+        { key: 'shield', label: 'Bouclier' },
+        { key: 'teleporter', label: 'Téléporteur' },
+        { key: 'jammer', label: 'Brouilleur' },
+        { key: 'mine', label: 'Mine' },
+        { key: 'boost', label: 'Boost' },
+        { key: 'aerobrake', label: 'Aérofrein' },
+        { key: 'missile', label: 'Missile' }
+    ];
+
+    powersList.forEach(power => {
+        if (vehicle[power.key]) {
+            const btn = document.createElement('button');
+            btn.textContent = power.label;
+            btn.onclick = () => activatePower(player, power.key);
+            powersDiv.appendChild(btn);
+        }
+    });
+}
 
 
+function activatePower(player, powerKey) {
+    switch (powerKey) {
+        case 'shield':
+            activateShield(player);
+            break;
+        case 'teleporter':
+            activateTeleporter(player);
+            break;
+        case 'jammer':
+            activateJammer(player);
+            break;
+        case 'mine':
+            activateMine(player);
+            break;
+        case 'boost':
+            activateBoost(player);
+            break;
+        case 'aerobrake':
+            activateAerobrake(player);
+            break;
+        case 'missile':
+            activateMissile(player);
+            break;
+    }
+    renderGrid();
+    updateActionDisplay(player);
+    showPowers(player);
+}
+
+function activatePower(player, powerKey) {
+    switch (powerKey) {
+        case 'shield':
+            activateShield(player);
+            break;
+        case 'teleporter':
+            activateTeleporter(player);
+            break;
+        case 'jammer':
+            activateJammer(player);
+            break;
+        case 'mine':
+            activateMine(player);
+            break;
+        case 'boost':
+            activateBoost(player);
+            break;
+        case 'aerobrake':
+            activateAerobrake(player);
+            break;
+        case 'missile':
+            activateMissile(player);
+            break;
+    }
+    renderGrid();
+    updateActionDisplay(player);
+    showPowers(player);
+}
+
+//Bouclier temporaire
+//function activateShield(player) {
+//    player.shieldActive = true;
+//    setTimeout(() => {
+//        player.shieldActive = false;
+//        updateActionDisplay(player);
+//    }, 5000); // Bouclier actif pendant 5 secondes
+//}
+//ou Bouclier permanent
+function activateShield(player) {
+    player.shieldActive = true;
+}
+
+function activateAerobrake(player) {
+    player.latence = 0;
+    player.actionGauge = 0;
+    updateActionDisplay(player);
+}
+
+function activateMissile(player) {
+    // Tire un missile dans la direction du joueur
+    let x = player.x, y = player.y;
+    let dx = 0, dy = 0;
+    if (player.dir === 'up') dy = -1;
+    if (player.dir === 'down') dy = 1;
+    if (player.dir === 'left') dx = -1;
+    if (player.dir === 'right') dx = 1;
+
+    // Parcours jusqu'à toucher un mur ou un autre joueur
+    //while (true) {
+    //portée de 4 cases
+    for (let i = 0; i < 4; i++) {
+        x += dx;
+        y += dy;
+        if (x < 0 || x >= gridSize || y < 0 || y >= gridSize) break;
+        if (grid[y][x].type === 'wall' || grid[y][x].type === 'player') {
+            //// Explosion ou effet
+            //grid[y][x] = { type: "crash", playerId: player.id };
+            //break;
+            //}
+            if (grid[y][x].type === 'player') {
+                const otherId = grid[y][x].playerId;
+                players[otherId].alive = false;
+            }
+            grid[y][x] = { type: "empty", playerId: null };
+        }
+    }
+    renderGrid();
+}
+
+function activateTeleporter(player) {
+    // Trouver une position aléatoire vide sur la grille
+    let newX, newY;
+    do {
+        newX = Math.floor(Math.random() * gridSize);
+        newY = Math.floor(Math.random() * gridSize);
+    } while (grid[newY][newX].type !== "empty");
+
+    // Déplacer le joueur à la nouvelle position
+    grid[player.y][player.x] = { type: "empty", playerId: null };
+    player.x = newX;
+    player.y = newY;
+    grid[player.y][player.x] = { type: "player", playerId: player.id };
+}
+
+function activateJammer(player) {
+    let closestPlayer = null;
+    let minDistance = Infinity;
+
+    players.forEach(p => {
+        if (p.id !== player.id && p.alive) {
+            const distance = Math.sqrt(Math.pow(p.x - player.x, 2) + Math.pow(p.y - player.y, 2));
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestPlayer = p;
+            }
+        }
+    });
+
+    if (closestPlayer) {
+        closestPlayer.latence = 3;
+    }
+}
+
+function activateBoost(player) {
+    const vehicle = VEHICLES[player.vehicleId];
+    const maxActionGauge = vehicle.maxActionGauge;
+    const boostValue = 3; // Le boost donne 3 actions
+
+    if (player.actionGauge === 0) {
+        // Si la jauge est vide, augmenter de la valeur du boost
+        player.actionGauge += boostValue;
+    } else if (player.actionGauge < maxActionGauge) {
+        // Si la jauge n'est pas pleine, augmenter de la valeur du boost et gérer l'excédent
+        const newGauge = player.actionGauge + boostValue;
+        if (newGauge > maxActionGauge) {
+            const excess = newGauge - maxActionGauge;
+            player.actionGauge = maxActionGauge;
+            // Avancer automatiquement du nombre de cases correspondant à l'excédent
+            for (let i = 0; i < excess; i++) {
+                movePlayer(player);
+            }
+        } else {
+            player.actionGauge = newGauge;
+        }
+    } else {
+        // Si la jauge est pleine, avancer automatiquement du nombre de cases correspondant au boost
+        for (let i = 0; i < boostValue; i++) {
+            movePlayer(player);
+        }
+    }
+
+    updateActionDisplay(player);
+    renderGrid();
+}
 
 
+function activateMine(player) {
+    const mineX = player.x;
+    const mineY = player.y;
 
+    // Marquer la case avec une mine inactive
+    grid[mineY][mineX] = { type: "mine", playerId: player.id, active: false };
 
+    // Activer la mine après que le joueur ait quitté la zone
+    setTimeout(() => {
+        if (grid[mineY][mineX].type === "mine" && !grid[mineY][mineX].active) {
+            grid[mineY][mineX].active = true;
+            renderGrid(); // Assurez-vous de mettre à jour l'affichage
+        }
+    }, 5000); // Attendre que le joueur soit hors de portée
+}
+
+function checkMineExplosion(x, y) {
+    for (let i = Math.max(0, x - 2); i <= Math.min(gridSize - 1, x + 2); i++) {
+        for (let j = Math.max(0, y - 2); j <= Math.min(gridSize - 1, y + 2); j++) {
+            if (grid[j][i].type === "mine" && grid[j][i].active) {
+                explodeMine(i, j);
+                return;
+            }
+        }
+    }
+}
+
+function explodeMine(x, y) {
+    for (let i = Math.max(0, x - 4); i <= Math.min(gridSize - 1, x + 4); i++) {
+        for (let j = Math.max(0, y - 4); j <= Math.min(gridSize - 1, y + 4); j++) {
+            if (grid[j][i].type === "player") {
+                const playerId = grid[j][i].playerId;
+                players[playerId].alive = false;
+            }
+            grid[j][i] = { type: "empty", playerId: null };
+        }
+    }
+    renderGrid();
+}
 
 
 
