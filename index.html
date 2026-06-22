@@ -8,13 +8,25 @@
 </head>
 <body>
     <h1 class="title">Hyperliner</h1>
+    <div id="setup-screen">
+        <div class="setup-panel">
+            <h2 class="setup-title">Choisissez votre véhicule</h2>
+            <p class="setup-hint">Sélectionnez un vaisseau puis lancez la partie.</p>
+            <div id="vehicle-choices" class="vehicle-choices"></div>
+            <button type="button" id="start-game-btn" class="start-game-btn">Commencer la partie</button>
+        </div>
+    </div>
+    <div id="game-ui" class="game-ui-hidden">
     <div id="main-layout">
         <div id="game-container"></div>
         <div id="side-panel">
             <div id="action-gauge"></div>
+            <div id="vehicle-roster"></div>
         </div>
     </div>
     <div id="controls"></div>
+    <div id="power-controls"></div>
+    </div>
 
 
 
