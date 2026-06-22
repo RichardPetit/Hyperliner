@@ -46,7 +46,7 @@ body {
 }
 
 .wall {
-    background: #888; /* Gris foncù pour les murs */
+    background: #888; /* Gris foncÔøΩ pour les murs */
 }
 
 #controls {
@@ -103,6 +103,115 @@ body {
     margin-top: 20px;
     margin-bottom: 6px;
     color: #ccc;
+}
+
+.game-ui-hidden {
+    visibility: hidden;
+    pointer-events: none;
+}
+
+#setup-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(45, 6, 54, 0.92);
+    padding: 20px;
+}
+
+#setup-screen.hidden {
+    display: none;
+}
+
+.setup-panel {
+    max-width: 720px;
+    width: 100%;
+    background: #1a0a22;
+    border: 1px solid #7FFFD4;
+    border-radius: 14px;
+    padding: 24px 28px;
+    box-shadow: 0 0 32px rgba(127, 255, 212, 0.15);
+}
+
+.setup-title {
+    color: #7FFFD4;
+    margin: 0 0 8px;
+    text-align: center;
+}
+
+.setup-hint {
+    color: #aaa;
+    text-align: center;
+    margin: 0 0 20px;
+    font-size: 0.9rem;
+}
+
+.vehicle-choices {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+    margin-bottom: 24px;
+}
+
+.vehicle-choice-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 12px 14px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 2px solid transparent;
+    border-radius: 8px;
+    color: #fff;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.vehicle-choice-card:hover {
+    background: rgba(127, 255, 212, 0.1);
+    border-color: rgba(127, 255, 212, 0.4);
+}
+
+.vehicle-choice-card.selected {
+    border-color: #7FFFD4;
+    background: rgba(127, 255, 212, 0.12);
+    box-shadow: 0 0 12px rgba(127, 255, 212, 0.25);
+}
+
+.vehicle-choice-name {
+    font-weight: bold;
+    font-size: 1rem;
+}
+
+.vehicle-choice-powers {
+    font-size: 0.75rem;
+    color: #bbb;
+    line-height: 1.35;
+}
+
+.start-game-btn {
+    display: block;
+    width: 100%;
+    padding: 14px 20px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: #2D0636;
+    background: #7FFFD4;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+}
+
+.start-game-btn:hover {
+    background: #9effe8;
+}
+
+.start-game-btn:active {
+    transform: scale(0.98);
 }
 
 .vehicle-select {
@@ -233,7 +342,7 @@ body {
     text-align: center;
 }
 
-/* Formes distinctives par vùhicule */
+/* Formes distinctives par vÔøΩhicule */
 .player.vehicle-snypase::before {
     content: '';
     position: absolute;
@@ -437,54 +546,47 @@ body {
 }
 
 
-.mine {
-    position: relative;
-    background: #F2F2F2; /* Fond de la case inchangù */
+.mine-wall.mine-pending::after,
+.wall.mine-pending::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 9px;
+    height: 9px;
+    background-color: #6b0000;
+    transform: translate(-50%, -50%);
+    border-radius: 2px;
+    z-index: 12;
+    pointer-events: none;
+    opacity: 0.85;
 }
 
-    .mine::after {
-        content: '';
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        width: 10px; /* Taille du petit carrù */
-        height: 10px; /* Taille du petit carrù */
-        background-color: #8B0000; /* Rouge foncù */
-        transform: translate(-50%, -50%); /* Centrer le carrù */
-        border-radius: 2px; /* Coins lùgùrement arrondis */
-    }
-
-.mine-active {
-    position: relative;
-    background: #F2F2F2; /* Fond de la case inchangù */
+.mine-wall.mine-active::after,
+.wall.mine-active::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 9px;
+    height: 9px;
+    background-color: #ff3333;
+    transform: translate(-50%, -50%);
+    border-radius: 2px;
+    z-index: 12;
+    pointer-events: none;
+    box-shadow: 0 0 6px #ff0000, 0 0 12px #ff4444;
+    animation: mine-glow 1.2s ease-in-out infinite;
 }
 
-    .mine-active::after {
-        content: '';
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        width: 10px;
-        height: 10px;
-        background-color: #FF0000; /* Rouge vif */
-        transform: translate(-50%, -50%);
-        border-radius: 2px;
-        box-shadow: 0 0 10px #FF0000, 0 0 20px #FF0000, 0 0 30px #FF0000; /* Effet lumineux */
-        animation: pulse 1.5s infinite;
-    }
-
-@keyframes pulse {
-    0% {
-        box-shadow: 0 0 10px #FF0000, 0 0 20px #FF0000, 0 0 30px #FF0000;
+@keyframes mine-glow {
+    0%, 100% {
+        box-shadow: 0 0 4px #ff0000, 0 0 8px #ff3333;
+        background-color: #cc0000;
     }
 
     50% {
-        box-shadow: 0 0 15px #FF0000, 0 0 25px #FF0000, 0 0 35px #FF0000;
-    }
-
-    100% {
-        box-shadow: 0 0 10px #FF0000, 0 0 20px #FF0000, 0 0 30px #FF0000;
+        box-shadow: 0 0 8px #ff0000, 0 0 16px #ff6666;
+        background-color: #ff4444;
     }
 }
-
-
