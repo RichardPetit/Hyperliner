@@ -1,5 +1,6 @@
 ﻿// main.js
 const gridSize = 22;
+const HUMAN_PLAYER_ID = 0;
 const gameContainer = document.getElementById('game-container');
 const playerColors = [
     "#7FFFD4", // vert d'eau (Aqua)
@@ -54,40 +55,161 @@ function renderGrid() {
             const cell = document.querySelector(`.cell[data-x="${x}"][data-y="${y}"]`);
             if (!cell) continue;
 
-            // Reset classes et styles
-            // à voir
-            //cell.className = 'cell';
+            cell.className = 'cell';
             cell.style.background = '';
             cell.style.boxShadow = '';
+            cell.innerHTML = '';
 
             const cellState = grid[y][x];
             if (cellState.type === 'player') {
                 const player = players[cellState.playerId];
-                cell.classList.add('player');
+                const vehicle = VEHICLES[player.vehicleId];
+                cell.classList.add('player', `vehicle-${player.vehicleId}`);
+                if (player.id === HUMAN_PLAYER_ID) cell.classList.add('player-human');
+                if (player.shieldActive) cell.classList.add('shield-active');
+                cell.dataset.dir = player.dir;
                 cell.style.background = player.color;
-                cell.style.color = player.color;
+                cell.innerHTML = `<span class="vehicle-badge">${vehicle.id}</span>`;
                 cell.style.boxShadow = `
           0 0 8px #fff,
-          0 0 16px ${player.shadowColor},
-          0 0 32px ${player.shadowColor},
-          0 0 48px ${player.shadowColor}
+          0 0 16px ${player.color},
+          0 0 32px ${player.color}
         `;
             } else if (cellState.type === 'wall') {
                 const player = players[cellState.playerId];
-                cell.classList.add('wall');
-                cell.style.background = '#888'; // gris
+                cell.classList.add('wall', `wall-${player.vehicleId}`);
+                cell.style.background = '#888';
                 cell.style.boxShadow = `0 0 6px 2px ${player.color}`;
             } else if (cellState.type === 'crash') {
                 cell.classList.add('crash');
-                cell.style.background = '#e53935'; // rouge vif
+                cell.style.background = '#e53935';
                 cell.innerHTML = '<span class="crash-x">✖</span>';
+            } else if (cellState.type === 'mine') {
+                cell.classList.add(cellState.active ? 'mine-active' : 'mine');
             }
         }
     }
 }
 
+function getPlayerPowersSummary(player) {
+    return bonusKeys
+        .filter(key => player[key])
+        .map(key => POWER_LABELS[key])
+        .join(', ');
+}
+
+function getVehiclePowersSummary(vehicle) {
+    return bonusKeys
+        .filter(key => vehicle[key])
+        .map(key => POWER_LABELS[key])
+        .join(', ');
+}
+
+function renderVehicleRoster() {
+    const roster = document.getElementById('vehicle-roster');
+    if (!roster) return;
+
+    let html = '<div class="roster-title">Véhicules en jeu</div>';
+    players.forEach(player => {
+        if (!player.alive) return;
+        const vehicle = VEHICLES[player.vehicleId];
+        const isHuman = player.id === HUMAN_PLAYER_ID;
+        const powers = getPlayerPowersSummary(player);
+        html += `
+          <div class="roster-entry${isHuman ? ' roster-human' : ''}">
+            <span class="roster-dot" style="background:${player.color}"></span>
+            <span class="roster-vehicle">${vehicle.nom} <span class="roster-code">${vehicle.id}</span></span>
+            ${isHuman ? '<span class="roster-you">(vous)</span>' : ''}
+            <div class="roster-powers">${powers || 'Aucun pouvoir'}</div>
+          </div>`;
+    });
+    roster.innerHTML = html;
+}
+
+let selectedVehicleId = 'snypase';
+let gameStarted = false;
+
+function initSetupScreen() {
+    const container = document.getElementById('vehicle-choices');
+    if (!container) return;
+
+    container.innerHTML = '';
+    Object.entries(VEHICLES).forEach(([key, vehicle]) => {
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'vehicle-choice-card';
+        card.dataset.vehicleId = key;
+        const powers = getVehiclePowersSummary(vehicle);
+        card.innerHTML = `
+            <span class="vehicle-choice-name">${vehicle.nom}</span>
+            <span class="roster-code">${vehicle.id}</span>
+            <span class="vehicle-choice-powers">${powers || 'Aucun pouvoir'}</span>`;
+        card.onclick = () => selectSetupVehicle(key);
+        container.appendChild(card);
+    });
+
+    selectSetupVehicle(selectedVehicleId);
+
+    const startBtn = document.getElementById('start-game-btn');
+    if (startBtn) startBtn.onclick = startGame;
+}
+
+function selectSetupVehicle(vehicleId) {
+    if (!VEHICLES[vehicleId]) return;
+    selectedVehicleId = vehicleId;
+    document.querySelectorAll('.vehicle-choice-card').forEach(card => {
+        card.classList.toggle('selected', card.dataset.vehicleId === vehicleId);
+    });
+}
+
+function startGame() {
+    if (gameStarted) return;
+    gameStarted = true;
+
+    const setupScreen = document.getElementById('setup-screen');
+    const gameUi = document.getElementById('game-ui');
+    if (setupScreen) setupScreen.classList.add('hidden');
+    if (gameUi) gameUi.classList.remove('game-ui-hidden');
+
+    setHumanVehicle(selectedVehicleId);
+
+    const now = Date.now();
+    players[HUMAN_PLAYER_ID].lastActionTime = now;
+    players.forEach(player => {
+        if (player.id !== HUMAN_PLAYER_ID) {
+            player.lastActionTime = now + player.id * 250;
+        }
+    });
+
+    renderGrid();
+    renderVehicleRoster();
+    updateActionDisplay(players[HUMAN_PLAYER_ID]);
+    showDirectionControls(players[HUMAN_PLAYER_ID]);
+    showPowerControls(players[HUMAN_PLAYER_ID]);
+}
+
+function setHumanVehicle(vehicleId) {
+    const player = players[HUMAN_PLAYER_ID];
+    if (!VEHICLES[vehicleId]) return;
+
+    player.vehicleId = vehicleId;
+    const vehicle = VEHICLES[vehicleId];
+    bonusKeys.forEach(key => {
+        player[key] = !!vehicle[key];
+        player[`${key}Used`] = false;
+        if (key === 'shield') player.shieldActive = false;
+    });
+    player.actionGauge = Math.min(player.actionGauge, vehicle.maxActionGauge);
+
+    if (gameStarted) {
+        showPowerControls(player);
+        updateActionDisplay(player);
+        renderVehicleRoster();
+        renderGrid();
+    }
+}
+
 const players = [
-    // Bas (vers le haut)
     {
         id: 0,
         x: 7,
@@ -98,7 +220,7 @@ const players = [
         alive: true,
         score: 0,
         vehicleId: 'snypase',
-        actionGauge: 0,       // nombre d’actions de départ
+        actionGauge: 0,
         lastActionTime: Date.now()
     },
     {
@@ -110,11 +232,10 @@ const players = [
         color: "#FF69B4",
         alive: true,
         score: 0,
-        vehicleId: 'psionide',
-        actionGauge: 0, 
+        vehicleId: 'kortex',
+        actionGauge: 0,
         lastActionTime: Date.now()
     },
-    // Haut (vers le bas)
     {
         id: 2,
         x: 7,
@@ -125,23 +246,22 @@ const players = [
         alive: true,
         score: 0,
         vehicleId: 'psionide',
-        actionGauge: 0,     
+        actionGauge: 0,
         lastActionTime: Date.now()
     },
     {
         id: 3,
-        x:14,
+        x: 14,
         y: 4,
         dir: 'down',
         latence: 0,
         color: "#00BFFF",
         alive: true,
         score: 0,
-        vehicleId: 'psionide',
-        actionGauge: 0,  
+        vehicleId: 'vulture',
+        actionGauge: 0,
         lastActionTime: Date.now()
     },
-    // Gauche (vers la droite)
     {
         id: 4,
         x: 4,
@@ -151,8 +271,8 @@ const players = [
         color: "#FF6347",
         alive: true,
         score: 0,
-        vehicleId: 'psionide',
-        actionGauge: 0,  
+        vehicleId: 'mighty',
+        actionGauge: 0,
         lastActionTime: Date.now()
     },
     {
@@ -165,10 +285,9 @@ const players = [
         alive: true,
         score: 0,
         vehicleId: 'banshee',
-        actionGauge: 0, 
+        actionGauge: 0,
         lastActionTime: Date.now()
     },
-    // Droite (vers la gauche)
     {
         id: 6,
         x: 17,
@@ -178,10 +297,9 @@ const players = [
         color: "#BA55D3",
         alive: true,
         score: 0,
-        vehicleId: 'psionide',
-        actionGauge: 0,   
+        vehicleId: 'duck',
+        actionGauge: 0,
         lastActionTime: Date.now()
-
     },
     {
         id: 7,
@@ -193,7 +311,7 @@ const players = [
         alive: true,
         score: 0,
         vehicleId: 'psionide',
-        actionGauge: 0, 
+        actionGauge: 0,
         lastActionTime: Date.now()
     },
 ];
@@ -212,7 +330,6 @@ class Vehicle {
         this.maxActionGauge = options.maxActionGauge;
         this.rechargeTime = options.rechargeTime;
         this.latenceTourner = options.latenceTourner;
-        // Bonus et pouvoirs
         this.shield = options.shield || false;
         this.teleporter = options.teleporter || false;
         this.jammer = options.jammer || false;
@@ -223,6 +340,18 @@ class Vehicle {
     }
 }
 
+const JAMMER_LATENCE = 4;
+
+const POWER_LABELS = {
+    shield: 'Bouclier',
+    teleporter: 'Téléporteur',
+    jammer: 'Canon OEN',
+    mine: 'Mine',
+    boost: 'Boost',
+    aerobrake: 'Aérofrein',
+    missile: 'Missile',
+};
+
 const VEHICLES = {
     snypase: new Vehicle({
         id: 'Sny',
@@ -230,9 +359,6 @@ const VEHICLES = {
         maxActionGauge: 6,
         rechargeTime: 1200,
         latenceTourner: 4,
-        shield: false,
-        missile: true,
-        teleporter: true,
         boost: true,
         aerobrake: true,
     }),
@@ -242,11 +368,9 @@ const VEHICLES = {
         maxActionGauge: 11,
         rechargeTime: 2000,
         latenceTourner: 2,
-        shield: true,
-        missile: false,
-        jammer: true,
-        aerobrake: true,
         boost: true,
+        aerobrake: true,
+        jammer: true,
     }),
     bison: new Vehicle({
         id: 'Bis',
@@ -254,8 +378,10 @@ const VEHICLES = {
         maxActionGauge: 9,
         rechargeTime: 100,
         latenceTourner: 3,
+        boost: true,
+        aerobrake: true,
         shield: true,
-        missile: false,
+        missile: true,
     }),
     vulture: new Vehicle({
         id: 'Vul',
@@ -263,8 +389,9 @@ const VEHICLES = {
         maxActionGauge: 8,
         rechargeTime: 1200,
         latenceTourner: 2,
-        shield: true,
-        missile: false,
+        boost: true,
+        aerobrake: true,
+        mine: true,
     }),
     kortex: new Vehicle({
         id: 'Kor',
@@ -272,8 +399,11 @@ const VEHICLES = {
         maxActionGauge: 8,
         rechargeTime: 1200,
         latenceTourner: 2,
+        boost: true,
+        aerobrake: true,
+        missile: true,
         shield: true,
-        missile: false,
+        teleporter: true,
     }),
     banshee: new Vehicle({
         id: 'Ban',
@@ -281,11 +411,8 @@ const VEHICLES = {
         maxActionGauge: 8,
         rechargeTime: 1000,
         latenceTourner: 2,
-        shield: false,
-        missile: false,
-        teleporter: true,
         boost: true,
-        aerobrake: true,
+        missile: true,
     }),
     mighty: new Vehicle({
         id: 'Mig',
@@ -293,8 +420,7 @@ const VEHICLES = {
         maxActionGauge: 8,
         rechargeTime: 1200,
         latenceTourner: 2,
-        shield: true,
-        missile: false,
+        aerobrake: true,
     }),
     duck: new Vehicle({
         id: 'Duc',
@@ -302,8 +428,6 @@ const VEHICLES = {
         maxActionGauge: 8,
         rechargeTime: 1200,
         latenceTourner: 2,
-        shield: true,
-        missile: false,
     }),
 }
 //const vehicle = VEHICLES[player.vehicleId];
@@ -316,10 +440,11 @@ const bonusKeys = [
 players.forEach(player => {
     const vehicle = VEHICLES[player.vehicleId];
     bonusKeys.forEach(key => {
-        // Possession du pouvoir
         player[key] = !!vehicle[key];
-        // Etat actif du pouvoir (initialisé à true si possédé, sinon false)
-        player[`${key}Active`] = !!vehicle[key];
+        player[`${key}Used`] = false;
+        if (key === 'shield') {
+            player.shieldActive = false;
+        }
     });
 });
 
@@ -330,59 +455,20 @@ players.forEach(player => {
 
 
 
-// Place les joueurs et leur mur de départ
-players.forEach(player => {
-    // Place le joueur
-    const playerCell = document.querySelector(
-        `.cell[data-x="${player.x}"][data-y="${player.y}"]`
-    );
-    if (playerCell) {
-        playerCell.classList.add('player');
-        playerCell.style.background = player.color;
-        playerCell.style.color = player.color;
-        playerCell.style.boxShadow = `
-      0 0 8px #fff,
-      0 0 16px ${player.shadowColor},
-      0 0 32px ${player.shadowColor},
-      0 0 48px ${player.shadowColor}
-    `;
-    }
-
-    // Place le mur derrière
-    let wallX = player.x, wallY = player.y;
-    if (player.dir === 'up') wallY = (player.y + 1) % 22;
-    if (player.dir === 'down') wallY = (player.y - 1 + 22) % 22;
-    if (player.dir === 'left') wallX = (player.x + 1) % 22;
-    if (player.dir === 'right') wallX = (player.x - 1 + 22) % 22;
-
-    const wallCell = document.querySelector(
-        `.cell[data-x="${wallX}"][data-y="${wallY}"]`
-    );
-    if (wallCell) {
-        wallCell.classList.add('wall');
-        wallCell.style.boxShadow = wallShadow(player.color);
-    }
-});
-
 let grid = [];
 for (let y = 0; y < gridSize; y++) {
     grid[y] = [];
     for (let x = 0; x < gridSize; x++) {
         grid[y][x] = {
-            type: "empty",    // "empty", "wall", ou "player"
-            playerId: null    // id du joueur si la case est occupée
+            type: "empty",
+            playerId: null
         };
     }
 }
-updateActionDisplay(players[0]);
-
-
 
 players.forEach(player => {
-    // Place le joueur sur la grille
     grid[player.y][player.x] = { type: "player", playerId: player.id };
 
-    // Place le mur derrière le joueur
     let wallX = player.x, wallY = player.y;
     if (player.dir === 'up') wallY = (player.y + 1) % gridSize;
     if (player.dir === 'down') wallY = (player.y - 1 + gridSize) % gridSize;
@@ -391,32 +477,18 @@ players.forEach(player => {
 
     grid[wallY][wallX] = { type: "wall", playerId: player.id };
 });
-// Supposons que tu veux contrôler le premier joueur (index 0)
-showDirectionControls(players[0]);
-showPowerControls(players[0]);
+
+initSetupScreen();
+renderGrid();
+renderVehicleRoster();
 
 function showDirectionControls(player) {
     const controls = document.getElementById('controls');
-    controls.innerHTML = ''; // Efface les anciens contrôles
+    controls.innerHTML = '';
 
-    // Directions possibles basées sur la direction actuelle
-    let possibleDirections = [];
-    if (player.latence > 0) {
-        // Seule la direction actuelle est possible
-        possibleDirections.push(player.dir);
-    } else {
-        // Peut tourner à gauche, à droite, ou continuer tout droit
-        if (player.dir === 'up' || player.dir === 'down') {
-            possibleDirections = ['left', player.dir, 'right'];
-        } else {
-            possibleDirections = ['up', player.dir, 'down'];
-        }
-    }
-
-    // Filtrer les directions sûres
+    const possibleDirections = getPossibleDirections(player);
     const safeDirections = possibleDirections.filter(dir => isDirectionSafe(player, dir));
 
-    // Créer un bouton pour chaque direction sûre
     safeDirections.forEach(direction => {
         const btn = document.createElement('button');
         btn.className = 'arrow-btn arrow-' + direction;
@@ -426,31 +498,177 @@ function showDirectionControls(player) {
     });
 }
 
+function getNextPosition(x, y, direction) {
+    let nextX = x;
+    let nextY = y;
+    if (direction === 'up') nextY = (y - 1 + gridSize) % gridSize;
+    if (direction === 'down') nextY = (y + 1) % gridSize;
+    if (direction === 'left') nextX = (x - 1 + gridSize) % gridSize;
+    if (direction === 'right') nextX = (x + 1) % gridSize;
+    return { x: nextX, y: nextY };
+}
+
+function getPossibleDirections(player) {
+    if (player.latence > 0) {
+        return [player.dir];
+    }
+    if (player.dir === 'up' || player.dir === 'down') {
+        return ['left', player.dir, 'right'];
+    }
+    return ['up', player.dir, 'down'];
+}
+
 function isDirectionSafe(player, direction) {
-    let nextX = player.x;
-    let nextY = player.y;
+    const { x: nextX, y: nextY } = getNextPosition(player.x, player.y, direction);
+    const nextType = grid[nextY][nextX].type;
 
-    // Calculer la prochaine position en fonction de la direction
-    if (direction === 'up') nextY = (player.y - 1 + gridSize) % gridSize;
-    if (direction === 'down') nextY = (player.y + 1) % gridSize;
-    if (direction === 'left') nextX = (player.x - 1 + gridSize) % gridSize;
-    if (direction === 'right') nextX = (player.x + 1) % gridSize;
+    if (nextType === "empty") return true;
+    if (player.shieldActive && nextType === "wall") return true;
 
-    // Vérifier si la prochaine case est sûre (vide)
-    const isSafe = grid[nextY][nextX].type === "empty";
-
-    // Vérifier si la direction proposée ne fait pas reculer le joueur dans son propre mur
-    if (!isSafe) {
-        // Vérifier si la direction est opposée à la direction actuelle
-        if ((direction === 'up' && player.dir === 'down') ||
-            (direction === 'down' && player.dir === 'up') ||
-            (direction === 'left' && player.dir === 'right') ||
-            (direction === 'right' && player.dir === 'left')) {
-            return false;
-        }
+    if ((direction === 'up' && player.dir === 'down') ||
+        (direction === 'down' && player.dir === 'up') ||
+        (direction === 'left' && player.dir === 'right') ||
+        (direction === 'right' && player.dir === 'left')) {
+        return false;
     }
 
-    return isSafe;
+    return false;
+}
+
+function countOpenSpace(x, y, direction) {
+    let cx = x;
+    let cy = y;
+    let count = 0;
+    for (let i = 0; i < gridSize; i++) {
+        const next = getNextPosition(cx, cy, direction);
+        if (grid[next.y][next.x].type !== "empty") break;
+        count++;
+        cx = next.x;
+        cy = next.y;
+    }
+    return count;
+}
+
+function isCellTargetedByOther(player, x, y) {
+    for (const other of players) {
+        if (!other.alive || other.id === player.id) continue;
+        const vehicle = VEHICLES[other.vehicleId];
+        const canMove = other.actionGauge > 0 || other.actionGauge >= vehicle.maxActionGauge;
+        if (!canMove) continue;
+
+        const target = getNextPosition(other.x, other.y, other.dir);
+        if (target.x === x && target.y === y) return true;
+    }
+    return false;
+}
+
+function scoreDirection(player, direction) {
+    const { x: nextX, y: nextY } = getNextPosition(player.x, player.y, direction);
+    let score = countOpenSpace(nextX, nextY, direction) * 3;
+
+    if (direction === player.dir) score += 2;
+
+    for (const other of players) {
+        if (!other.alive || other.id === player.id) continue;
+        const dist = Math.abs(other.x - nextX) + Math.abs(other.y - nextY);
+        if (dist <= 1) score -= 40;
+        else if (dist <= 3) score -= 8 / dist;
+    }
+
+    if (isCellTargetedByOther(player, nextX, nextY)) score -= 50;
+
+    const leftTurn = getLeftDirection(player.dir);
+    const rightTurn = getRightDirection(player.dir);
+    if (direction === leftTurn || direction === rightTurn) {
+        const straightSpace = countOpenSpace(player.x, player.y, player.dir);
+        if (straightSpace <= 2) score += 5;
+    }
+
+    return score + Math.random() * 0.5;
+}
+
+function getLeftDirection(dir) {
+    const turns = { up: 'left', left: 'down', down: 'right', right: 'up' };
+    return turns[dir];
+}
+
+function getRightDirection(dir) {
+    const turns = { up: 'right', right: 'down', down: 'left', left: 'up' };
+    return turns[dir];
+}
+
+function chooseBotDirection(player) {
+    const possible = getPossibleDirections(player);
+    const safe = possible.filter(dir => isDirectionSafe(player, dir));
+
+    if (safe.length === 0) return player.dir;
+    if (safe.length === 1) return safe[0];
+
+    let bestDir = safe[0];
+    let bestScore = -Infinity;
+    for (const dir of safe) {
+        const score = scoreDirection(player, dir);
+        if (score > bestScore) {
+            bestScore = score;
+            bestDir = dir;
+        }
+    }
+    return bestDir;
+}
+
+function executePlayerMove(player, direction) {
+    const vehicle = VEHICLES[player.vehicleId];
+    if (player.actionGauge <= 0) return false;
+    if (player.latence > 0 && direction !== player.dir) return false;
+
+    if (direction !== player.dir) {
+        player.dir = direction;
+        player.latence = vehicle.latenceTourner;
+    }
+
+    player.actionGauge--;
+    movePlayer(player);
+    return true;
+}
+
+function botAutoMove(player) {
+    const vehicle = VEHICLES[player.vehicleId];
+    const direction = chooseBotDirection(player);
+
+    if (direction !== player.dir && player.latence === 0) {
+        player.dir = direction;
+        player.latence = vehicle.latenceTourner;
+    }
+
+    movePlayer(player);
+}
+
+function maybeBotAct(player) {
+    const vehicle = VEHICLES[player.vehicleId];
+    if (player.actionGauge <= 0) return;
+
+    const straightSafe = isDirectionSafe(player, player.dir);
+
+    if (!straightSafe) {
+        executePlayerMove(player, chooseBotDirection(player));
+        return;
+    }
+
+    if (player.actionGauge >= vehicle.maxActionGauge - 1) {
+        executePlayerMove(player, chooseBotDirection(player));
+        return;
+    }
+
+    const bestDir = chooseBotDirection(player);
+    const straightSpace = countOpenSpace(player.x, player.y, player.dir);
+    if (bestDir !== player.dir && player.latence === 0 && straightSpace <= 3) {
+        executePlayerMove(player, bestDir);
+        return;
+    }
+
+    if (Math.random() < 0.04 && player.actionGauge > 2) {
+        executePlayerMove(player, chooseBotDirection(player));
+    }
 }
 
 function getArrowSymbol(dir) {
@@ -465,7 +683,6 @@ function getArrowSymbol(dir) {
 
 
 function movePlayer(player) {
-    // Calculer la nouvelle position avec wrap-around
     let nextX = player.x;
     let nextY = player.y;
     if (player.dir === 'up') nextY = (player.y - 1 + gridSize) % gridSize;
@@ -473,67 +690,91 @@ function movePlayer(player) {
     if (player.dir === 'left') nextX = (player.x - 1 + gridSize) % gridSize;
     if (player.dir === 'right') nextX = (player.x + 1) % gridSize;
 
-    // Vérifier les collisions
-    if (grid[nextY][nextX].type !== "empty") {
-        // Si collision avec un mur, un joueur ou une case de crash
-        if (grid[nextY][nextX].type === "wall" || grid[nextY][nextX].type === "player" || grid[nextY][nextX].type === "crash") {
-            // Marquer la case actuelle comme un mur
+    const targetType = grid[nextY][nextX].type;
+
+    if (targetType === "wall" && player.shieldActive) {
+        grid[nextY][nextX] = { type: "empty", playerId: null };
+        player.shieldActive = false;
+        grid[player.y][player.x] = { type: "wall", playerId: player.id };
+        player.x = nextX;
+        player.y = nextY;
+        grid[player.y][player.x] = { type: "player", playerId: player.id };
+        if (player.latence > 0) player.latence--;
+        if (player.id === HUMAN_PLAYER_ID) updateActionDisplay(player);
+        return;
+    }
+
+    if (targetType !== "empty") {
+        if (targetType === "wall" || targetType === "player" || targetType === "crash") {
             grid[player.y][player.x] = { type: "wall", playerId: player.id };
 
-            // Si collision avec un autre joueur, éliminer cet autre joueur
-            if (grid[nextY][nextX].type === "player") {
+            if (targetType === "player") {
                 const otherPlayerId = grid[nextY][nextX].playerId;
                 players[otherPlayerId].alive = false;
             }
 
-            // Marquer la case de collision comme un crash et éliminer le joueur actuel
             grid[nextY][nextX] = { type: "crash", playerId: player.id };
             player.alive = false;
 
             renderGrid();
-            setTimeout(() => {
-                alert("Le joueur est éliminé !");
-            }, 100);
+            if (player.id === HUMAN_PLAYER_ID) {
+                setTimeout(() => {
+                    alert("Le joueur est éliminé !");
+                }, 100);
+            }
+            renderVehicleRoster();
             return;
         }
     }
 
-    // Si pas de collision, la case quittée devient un mur
     grid[player.y][player.x] = { type: "wall", playerId: player.id };
 
-    // Déplacer le joueur
     player.x = nextX;
     player.y = nextY;
     grid[player.y][player.x] = { type: "player", playerId: player.id };
 
-    // Gérer la latence
     if (player.latence > 0) player.latence--;
 }
 
 function rechargeActions() {
     const now = Date.now();
+    let needsRender = false;
+
     players.forEach(player => {
         const vehicle = VEHICLES[player.vehicleId];
         if (!player.alive) return;
 
-        // Si la jauge n'est pas pleine, on recharge normalement
         if (player.actionGauge < vehicle.maxActionGauge &&
             now - player.lastActionTime >= vehicle.rechargeTime) {
             player.actionGauge++;
             player.lastActionTime = now;
-            updateActionDisplay(player);
+            if (player.id === HUMAN_PLAYER_ID) {
+                updateActionDisplay(player);
+            } else {
+                maybeBotAct(player);
+                needsRender = true;
+            }
         }
-        // Si la jauge est pleine et qu'une recharge aurait dû avoir lieu
         else if (player.actionGauge >= vehicle.maxActionGauge &&
             now - player.lastActionTime >= vehicle.rechargeTime) {
-            // Avance automatiquement tout droit
-            movePlayer(player);
+            if (player.id === HUMAN_PLAYER_ID) {
+                movePlayer(player);
+                showDirectionControls(player);
+                updateActionDisplay(player);
+            } else {
+                botAutoMove(player);
+            }
             player.lastActionTime = now;
-            renderGrid();
-            showDirectionControls(player);
-            updateActionDisplay(player);
+            needsRender = true;
         }
     });
+
+    if (needsRender) {
+        renderGrid();
+        if (players[HUMAN_PLAYER_ID].alive) {
+            showDirectionControls(players[HUMAN_PLAYER_ID]);
+        }
+    }
 }
 
 
@@ -541,24 +782,12 @@ function rechargeActions() {
 setInterval(rechargeActions, 100);
 
 function handleDirectionClick(direction) {
-    let player = players[0];
-    const vehicle = VEHICLES[player.vehicleId];
-
-    if (player.actionGauge <= 0) return;
-
-    if (player.latence > 0 && direction !== player.dir) return;
-
-    // Si on tourne, on applique la latence du véhicule
-    if (direction !== player.dir) {
-        player.dir = direction;
-        player.latence = vehicle.latenceTourner;
+    const player = players[HUMAN_PLAYER_ID];
+    if (executePlayerMove(player, direction)) {
+        renderGrid();
+        showDirectionControls(player);
+        updateActionDisplay(player);
     }
-
-    player.actionGauge--;
-    movePlayer(player);
-    renderGrid();
-    showDirectionControls(player);
-    updateActionDisplay(player);
 }
 
 
@@ -566,14 +795,15 @@ function updateActionDisplay(player) {
     const gauge = document.getElementById('action-gauge');
     const vehicle = VEHICLES[player.vehicleId];
 
-    // Jauge d'accélération (verticale)
-    let html = '<div><b>Actions</b><br>';
+    let html = `<div class="vehicle-panel-name">${vehicle.nom} <span class="roster-code">${vehicle.id}</span></div>`;
+    html += `<div class="vehicle-panel-powers">${getPlayerPowersSummary(player)}</div>`;
+
+    html += '<div style="margin-top:12px"><b>Actions</b><br>';
     for (let i = vehicle.maxActionGauge; i > 0; i--) {
         html += `<div style="width:28px;height:18px; background:${i <= player.actionGauge ? '#0af' : '#eee'}; border-radius:4px; margin:2px auto"></div>`;
     }
     html += '</div>';
 
-    // Jauge de latence (verticale, uniquement si latence > 0)
     if (player.latence > 0) {
         html += '<div style="margin-top:20px"><b>Latence</b><br>';
         for (let i = player.latence; i > 0; i--) {
@@ -582,57 +812,41 @@ function updateActionDisplay(player) {
         html += '</div>';
     }
 
+    if (player.shieldActive) {
+        html += '<div class="shield-status">Bouclier actif</div>';
+    }
+
     gauge.innerHTML = html;
 }
 
 function showPowerControls(player) {
     const powerControls = document.getElementById('power-controls');
-    powerControls.innerHTML = ''; // Efface les anciens contrôles de pouvoir
+    powerControls.innerHTML = '';
 
-    const vehicle = VEHICLES[player.vehicleId];
+    bonusKeys.forEach(key => {
+        if (!player[key]) return;
 
-    // Liste des pouvoirs à afficher
-    const powersList = [
-        { key: 'shield', label: 'Bouclier' },
-        { key: 'teleporter', label: 'Téléporteur' },
-        { key: 'jammer', label: 'Brouilleur' },
-        { key: 'mine', label: 'Mine' },
-        { key: 'boost', label: 'Boost' },
-        { key: 'aerobrake', label: 'Aérofrein' },
-        { key: 'missile', label: 'Missile' }
-    ];
+        const btn = document.createElement('button');
+        btn.textContent = POWER_LABELS[key];
+        const used = player[`${key}Used`];
 
-    powersList.forEach(power => {
-        if (vehicle[power.key]) {
-            const btn = document.createElement('button');
-            btn.textContent = power.label;
+        if (used) {
+            btn.disabled = true;
+            btn.classList.add('power-used');
+        } else {
+            btn.classList.add('power-available');
             btn.onclick = () => {
-                activatePower(player, power.key);
-                showPowerControls(player); // Mettre à jour les boutons après activation
+                activatePower(player, key);
             };
-
-            // Vérifier si le pouvoir est disponible
-            if (!vehicle[power.key]) {
-                btn.disabled = true;
-                btn.classList.add('disabled-power');
-            }
-
-            powerControls.appendChild(btn);
         }
+
+        powerControls.appendChild(btn);
     });
 }
 
-
 function activatePower(player, powerKey) {
-    const vehicle = VEHICLES[player.vehicleId];
+    if (!player[powerKey] || player[`${powerKey}Used`]) return;
 
-    // Vérifier si le pouvoir est disponible
-    if (!vehicle[powerKey]) {
-        console.log("Ce pouvoir n'est pas disponible.");
-        return;
-    }
-
-    // Activer le pouvoir
     switch (powerKey) {
         case 'shield':
             activateShield(player);
@@ -657,13 +871,14 @@ function activatePower(player, powerKey) {
             break;
     }
 
-    // Mettre à jour l'attribut du véhicule pour indiquer que le pouvoir a été utilisé
-    vehicle[powerKey] = false;
+    player[`${powerKey}Used`] = true;
 
-    // Mettre à jour l'affichage
     renderGrid();
     updateActionDisplay(player);
-    //showPowerControls(player);
+    if (player.id === HUMAN_PLAYER_ID) {
+        showDirectionControls(player);
+        showPowerControls(player);
+    }
 }
 
 
@@ -679,74 +894,21 @@ function activatePower(player, powerKey) {
 //ou Bouclier permanent
 function activateShield(player) {
     player.shieldActive = true;
-}
-
-function activateAerobrake(player) {
-    player.latence = 0;
-    player.actionGauge = 0;
     updateActionDisplay(player);
-    showDirectionControls(player); // Recalculer les contrôles de direction
+    renderGrid();
 }
 
-//function activateMissile(player) {
-//    let x = player.x;
-//    let y = player.y;
-//    let dx = 0;
-//    let dy = 0;
-
-//    // Déterminer la direction du missile
-//    if (player.dir === 'up') dy = -1;
-//    if (player.dir === 'down') dy = 1;
-//    if (player.dir === 'left') dx = -1;
-//    if (player.dir === 'right') dx = 1;
-
-//    // Déterminer la classe CSS en fonction de la direction
-//    const trailClass = (dx !== 0) ? 'missile-trail-horizontal' : 'missile-trail-vertical';
-
-//    // Parcourir jusqu'à 4 cases dans la direction du missile
-//    for (let i = 0; i < 4; i++) {
-//        x = (x + dx + gridSize) % gridSize;
-//        y = (y + dy + gridSize) % gridSize;
-
-//        // Appliquer un effet visuel temporaire
-//        const cell = document.querySelector(`.cell[data-x="${x}"][data-y="${y}"]`);
-//        if (cell) {
-//            cell.classList.add(trailClass);
-
-//            // Supprimer la classe après un court délai pour l'effet visuel
-//            setTimeout(() => {
-//                cell.classList.remove(trailClass);
-//            }, 300);
-//        }
-
-//        // Vérifier si la case contient un mur ou un joueur
-//        if (grid[y][x].type === 'wall' || grid[y][x].type === 'player') {
-//            const target = grid[y][x];
-//            if (target.type === 'player') {
-//                const targetPlayer = players[target.playerId];
-//                if (!targetPlayer.shieldActive) {
-//                    targetPlayer.alive = false;
-//                    setTimeout(() => {
-//                        alert(`Le joueur ${targetPlayer.id} est éliminé !`);
-//                    }, 100);
-//                } else {
-//                    console.log(`Le joueur ${targetPlayer.id} est protégé par un bouclier !`);
-//                }
-//            }
-//            // Détruire la case rencontrée si c'est un mur
-//            if (target.type === 'wall') {
-//                grid[y][x] = { type: "empty", playerId: null };
-//                if (cell) {
-//                    cell.className = 'cell';
-//                    cell.style.background = '#F2F2F2';
-//                    cell.style.boxShadow = '';
-//                }
-//            }
-//            break;
-//        }
-//    }
-//    renderGrid(); // Mettre à jour l'affichage de la grille
-//}
+function playMissileTrail(path, dx) {
+    const trailClass = dx !== 0 ? 'missile-trail-horizontal' : 'missile-trail-vertical';
+    path.forEach((pos, index) => {
+        setTimeout(() => {
+            const cell = document.querySelector(`.cell[data-x="${pos.x}"][data-y="${pos.y}"]`);
+            if (!cell) return;
+            cell.classList.add(trailClass);
+            setTimeout(() => cell.classList.remove(trailClass), 600);
+        }, index * 120);
+    });
+}
 
 function activateMissile(player) {
     let x = player.x;
@@ -754,60 +916,48 @@ function activateMissile(player) {
     let dx = 0;
     let dy = 0;
 
-    // Déterminer la direction du missile
     if (player.dir === 'up') dy = -1;
     if (player.dir === 'down') dy = 1;
     if (player.dir === 'left') dx = -1;
     if (player.dir === 'right') dx = 1;
 
-    // Parcourir jusqu'à 4 cases dans la direction du missile
+    const trailPath = [];
+
     for (let i = 0; i < 4; i++) {
         x = (x + dx + gridSize) % gridSize;
         y = (y + dy + gridSize) % gridSize;
+        trailPath.push({ x, y });
 
-        // Appliquer un effet visuel temporaire
-        const cell = document.querySelector(`.cell[data-x="${x}"][data-y="${y}"]`);
-        if (cell) {
-            const trailClass = (dx !== 0) ? 'missile-trail-horizontal' : 'missile-trail-vertical';
-            cell.classList.add(trailClass);
-            setTimeout(() => {
-                cell.classList.remove(trailClass);
-            }, 300);
-        }
-
-        // Vérifier si la case contient un mur ou un joueur
-        if (grid[y][x].type === 'wall' || grid[y][x].type === 'player') {
+        if (grid[y][x].type === 'wall' || grid[y][x].type === 'player' || grid[y][x].type === 'crash') {
             const target = grid[y][x];
             if (target.type === 'player') {
                 const targetPlayer = players[target.playerId];
                 if (!targetPlayer.shieldActive) {
                     targetPlayer.alive = false;
-                    // Retirer le joueur de la grille
-                    grid[y][x] = { type: "empty", playerId: null };
-                    if (cell) {
-                        cell.className = 'cell';
-                        cell.style.background = '#F2F2F2';
-                        cell.style.boxShadow = '';
+                    grid[y][x] = { type: "crash", playerId: null };
+                    if (targetPlayer.id === HUMAN_PLAYER_ID) {
+                        setTimeout(() => alert("Le joueur est éliminé !"), 100);
                     }
-                    setTimeout(() => {
-                        alert(`Le joueur ${targetPlayer.id} est éliminé !`);
-                    }, 100);
                 } else {
-                    console.log(`Le joueur ${targetPlayer.id} est protégé par un bouclier !`);
+                    targetPlayer.shieldActive = false;
                 }
-            } else if (target.type === 'wall') {
-                // Détruire le mur
+            } else {
                 grid[y][x] = { type: "empty", playerId: null };
-                if (cell) {
-                    cell.className = 'cell';
-                    cell.style.background = '#F2F2F2';
-                    cell.style.boxShadow = '';
-                }
             }
             break;
         }
     }
-    renderGrid(); // Mettre à jour l'affichage de la grille
+
+    renderGrid();
+    renderVehicleRoster();
+    playMissileTrail(trailPath, dx);
+}
+
+function activateAerobrake(player) {
+    player.latence = 0;
+    player.actionGauge = 0;
+    updateActionDisplay(player);
+    showDirectionControls(player);
 }
 
 
@@ -841,13 +991,19 @@ function activateTeleporter(player) {
 }
 
 
+function torusDistance(x1, y1, x2, y2) {
+    const dx = Math.min(Math.abs(x1 - x2), gridSize - Math.abs(x1 - x2));
+    const dy = Math.min(Math.abs(y1 - y2), gridSize - Math.abs(y1 - y2));
+    return Math.sqrt(dx * dx + dy * dy);
+}
+
 function activateJammer(player) {
     let closestPlayer = null;
     let minDistance = Infinity;
 
     players.forEach(p => {
         if (p.id !== player.id && p.alive) {
-            const distance = Math.sqrt(Math.pow(p.x - player.x, 2) + Math.pow(p.y - player.y, 2));
+            const distance = torusDistance(player.x, player.y, p.x, p.y);
             if (distance < minDistance) {
                 minDistance = distance;
                 closestPlayer = p;
@@ -855,8 +1011,22 @@ function activateJammer(player) {
         }
     });
 
-    if (closestPlayer) {
-        closestPlayer.latence = 3;
+    if (!closestPlayer) return;
+
+    closestPlayer.latence = JAMMER_LATENCE;
+    closestPlayer.jammedUntil = Date.now() + 800;
+
+    const cell = document.querySelector(
+        `.cell[data-x="${closestPlayer.x}"][data-y="${closestPlayer.y}"]`
+    );
+    if (cell) {
+        cell.classList.add('jammer-hit');
+        setTimeout(() => cell.classList.remove('jammer-hit'), 800);
+    }
+
+    if (closestPlayer.id === HUMAN_PLAYER_ID) {
+        updateActionDisplay(closestPlayer);
+        showDirectionControls(closestPlayer);
     }
 }
 
@@ -893,19 +1063,30 @@ function activateMine(player) {
     const mineX = player.x;
     const mineY = player.y;
 
-    // Marquer la case avec une mine inactive
+    // Placer la mine sur la grille
     grid[mineY][mineX] = { type: "mine", playerId: player.id, active: false };
 
-    // Activer la mine après que le joueur ait quitté la zone
+    // Afficher la mine sur la grille
+    const cell = document.querySelector(`.cell[data-x="${mineX}"][data-y="${mineY}"]`);
+    if (cell) {
+        cell.classList.add('mine');
+    }
+
+    // Activer la mine après un certain délai
     setTimeout(() => {
         if (grid[mineY][mineX].type === "mine" && !grid[mineY][mineX].active) {
             grid[mineY][mineX].active = true;
-            renderGrid(); // Assurez-vous de mettre à jour l'affichage
+            if (cell) {
+                cell.classList.remove('mine');
+                cell.classList.add('mine-active');
+            }
+            console.log("La mine est maintenant active !");
         }
-    }, 5000); // Attendre que le joueur soit hors de portée
+    }, 5000); // Délai de 5 secondes pour activer la mine
 }
 
 function checkMineExplosion(x, y) {
+    // Vérifier les cases autour de la position (x, y) pour une mine active
     for (let i = Math.max(0, x - 2); i <= Math.min(gridSize - 1, x + 2); i++) {
         for (let j = Math.max(0, y - 2); j <= Math.min(gridSize - 1, y + 2); j++) {
             if (grid[j][i].type === "mine" && grid[j][i].active) {
@@ -917,17 +1098,23 @@ function checkMineExplosion(x, y) {
 }
 
 function explodeMine(x, y) {
+    // Parcourir les cases autour de la mine pour éliminer les joueurs à proximité
     for (let i = Math.max(0, x - 4); i <= Math.min(gridSize - 1, x + 4); i++) {
         for (let j = Math.max(0, y - 4); j <= Math.min(gridSize - 1, y + 4); j++) {
             if (grid[j][i].type === "player") {
                 const playerId = grid[j][i].playerId;
                 players[playerId].alive = false;
+                console.log(`Le joueur ${playerId} est éliminé par l'explosion de la mine !`);
             }
+            // Retirer les joueurs et les murs dans le rayon de l'explosion
             grid[j][i] = { type: "empty", playerId: null };
         }
     }
+
+    // Mettre à jour l'affichage de la grille
     renderGrid();
 }
+
 
 
 
