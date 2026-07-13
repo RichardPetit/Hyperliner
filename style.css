@@ -22,6 +22,8 @@ body {
 }
 
 #game-container {
+    position: relative;
+    overflow: visible;
     margin-top: 20px;
     display: grid;
     grid-template-columns: repeat(22, 24px);
@@ -644,14 +646,411 @@ body {
 .wall-kortex { clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); }
 .wall-banshee { clip-path: polygon(0% 100%, 50% 0%, 100% 100%); }
 
-.jammer-hit {
-    animation: jammer-flash 0.8s ease-out;
+.jammer-hit,
+.power-jammer-hit {
+    animation: jammer-hit-effect 0.8s ease-out;
+    z-index: 25;
 }
 
-@keyframes jammer-flash {
+.power-jammer-hit::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border: 2px dashed #00e676;
+    border-radius: inherit;
+    animation: jammer-static 0.8s steps(4) forwards;
+    pointer-events: none;
+    z-index: 24;
+}
+
+@keyframes jammer-hit-effect {
     0%, 100% { filter: none; }
-    25%, 75% { filter: brightness(2) hue-rotate(90deg); }
-    50% { filter: brightness(2.5) hue-rotate(180deg); }
+    20%, 60% { filter: brightness(2) hue-rotate(80deg) contrast(1.4); }
+    40% { filter: brightness(2.5) hue-rotate(120deg) contrast(1.6); }
+}
+
+@keyframes jammer-static {
+    0%, 100% { opacity: 0.9; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(1.08); }
+}
+
+/* --- Téléporteur : éclair depuis le ciel --- */
+.teleport-sky-strike {
+    position: absolute;
+    pointer-events: none;
+    z-index: 60;
+    transform: translate(-50%, -50%);
+}
+
+.teleport-sky-beam {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 14px;
+    transform: translateX(-50%);
+    background: linear-gradient(
+        to top,
+        #fff 0%,
+        #F3E5F5 8%,
+        #E040FB 25%,
+        #AB47BC 55%,
+        rgba(156, 39, 176, 0.5) 80%,
+        transparent 100%
+    );
+    box-shadow: 0 0 20px #E040FB, 0 0 40px #9C27B0, 0 0 60px rgba(186, 85, 211, 0.7);
+    transform-origin: bottom center;
+    animation: teleport-beam-reveal 0.12s ease-out forwards;
+}
+
+.teleport-sky-bolt {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 42px;
+    height: 130px;
+    margin-left: -21px;
+    background: linear-gradient(180deg, #fff 0%, #F8BBFF 12%, #E040FB 40%, #AB47BC 70%, #7B1FA2 100%);
+    clip-path: polygon(
+        52% 0%, 34% 18%, 56% 18%, 28% 36%, 50% 36%, 22% 54%, 46% 54%, 16% 72%, 54% 72%, 38% 88%, 62% 88%,
+        44% 100%, 72% 62%, 52% 62%, 76% 44%, 56% 44%, 74% 26%, 54% 26%, 68% 8%, 48% 8%
+    );
+    filter: drop-shadow(0 0 8px #fff) drop-shadow(0 0 18px #E040FB) drop-shadow(0 0 36px #9C27B0);
+    animation: teleport-bolt-slam 0.14s cubic-bezier(0.9, 0, 1, 0.1) forwards;
+}
+
+.teleport-sky-flash {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 100px;
+    height: 100px;
+    margin-left: -50px;
+    margin-bottom: -50px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #fff 0%, #F3E5F5 12%, #E040FB 32%, #9C27B0 52%, transparent 72%);
+    opacity: 0;
+    animation: teleport-sky-impact-flash 0.22s ease-out forwards;
+    animation-delay: 0.08s;
+}
+
+.teleport-screen-flash {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 58;
+    background: radial-gradient(
+        circle 120px at var(--flash-x, 50%) var(--flash-y, 50%),
+        rgba(255, 255, 255, 0.55) 0%,
+        rgba(224, 64, 251, 0.45) 25%,
+        rgba(156, 39, 176, 0.2) 50%,
+        transparent 75%
+    );
+    animation: teleport-screen-flash 0.25s ease-out forwards;
+}
+
+.teleport-cell-flash {
+    z-index: 40 !important;
+    animation: teleport-cell-brighten 0.22s ease-out forwards;
+    animation-delay: 0.06s;
+}
+
+@keyframes teleport-beam-reveal {
+    0% { height: 0; opacity: 0; }
+    25% { opacity: 1; }
+    100% { height: var(--beam-height, 200px); opacity: 1; }
+}
+
+@keyframes teleport-bolt-slam {
+    0% {
+        transform: translateY(calc(-1 * var(--fall-distance, 220px)));
+        opacity: 0;
+    }
+    6% { opacity: 1; }
+    100% {
+        transform: translateY(12px);
+        opacity: 1;
+    }
+}
+
+@keyframes teleport-sky-impact-flash {
+    0% { opacity: 0; transform: scale(0.15); }
+    20% { opacity: 1; transform: scale(1.6); }
+    55% { opacity: 0.75; transform: scale(2.2); }
+    100% { opacity: 0; transform: scale(2.8); }
+}
+
+@keyframes teleport-screen-flash {
+    0% { opacity: 0; }
+    20% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+@keyframes teleport-cell-brighten {
+    0% { filter: none; }
+    30% { filter: brightness(3) saturate(1.5); box-shadow: 0 0 20px #E040FB, 0 0 40px #9C27B0 !important; }
+    100% { filter: none; }
+}
+
+/* --- Boost --- */
+.power-boost {
+    z-index: 25;
+    animation: power-boost-pulse 0.45s ease-out;
+}
+
+.power-boost::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: inherit;
+    background: radial-gradient(circle, rgba(255, 200, 50, 0.9) 0%, rgba(255, 120, 0, 0.5) 40%, transparent 70%);
+    pointer-events: none;
+    z-index: 20;
+    animation: power-boost-flame 0.45s ease-out;
+}
+
+@keyframes power-boost-pulse {
+    0% { transform: scale(1); }
+    30% { transform: scale(1.15); filter: brightness(1.8); }
+    100% { transform: scale(1); filter: none; }
+}
+
+@keyframes power-boost-flame {
+    0% { opacity: 0; transform: scale(0.5); }
+    40% { opacity: 1; transform: scale(1.3); }
+    100% { opacity: 0; transform: scale(1.6); }
+}
+
+/* --- Aérofrein --- */
+.power-aerobrake {
+    z-index: 25;
+    animation: power-aerobrake-shake 0.5s ease-out;
+}
+
+.power-aerobrake::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: inherit;
+    border: 3px solid rgba(255, 80, 60, 0.9);
+    box-shadow: 0 0 12px #ff4444, inset 0 0 8px rgba(255, 100, 80, 0.6);
+    pointer-events: none;
+    animation: power-aerobrake-ring 0.5s ease-out;
+}
+
+.power-aerobrake-front::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    background: linear-gradient(var(--brake-angle, to top), rgba(255, 60, 40, 0.85), transparent 70%);
+    pointer-events: none;
+    animation: power-aerobrake-front-flash 0.45s ease-out;
+}
+
+.power-aerobrake-sparks::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(circle, #ffaa44 0%, #ff4400 35%, transparent 65%);
+    pointer-events: none;
+    animation: power-aerobrake-spark 0.45s ease-out;
+}
+
+@keyframes power-aerobrake-shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-2px); }
+    40% { transform: translateX(2px); }
+    60% { transform: translateX(-1px); }
+}
+
+@keyframes power-aerobrake-ring {
+    0% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1.5); }
+}
+
+@keyframes power-aerobrake-front-flash {
+    0% { opacity: 0; }
+    30% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+@keyframes power-aerobrake-spark {
+    0% { opacity: 0; transform: scale(0.6); }
+    35% { opacity: 1; transform: scale(1.2); }
+    100% { opacity: 0; transform: scale(0.9); }
+}
+
+/* --- Missile --- */
+.power-missile-launch::before {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: inherit;
+    background: radial-gradient(circle, #fff 0%, #ff6600 30%, transparent 65%);
+    pointer-events: none;
+    z-index: 20;
+    animation: power-missile-muzzle 0.35s ease-out;
+}
+
+.power-missile-explosion {
+    z-index: 30;
+    animation: power-missile-blast-cell 0.5s ease-out;
+}
+
+.missile-explosion-burst {
+    position: absolute;
+    pointer-events: none;
+    z-index: 55;
+    transform: translate(-50%, -50%);
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #fff 0%, #ff8800 25%, #ff2200 50%, transparent 70%);
+    animation: missile-burst-expand 0.45s ease-out forwards;
+}
+
+@keyframes power-missile-muzzle {
+    0% { opacity: 0; transform: scale(0.3); }
+    40% { opacity: 1; transform: scale(1.4); }
+    100% { opacity: 0; transform: scale(1.8); }
+}
+
+@keyframes power-missile-blast-cell {
+    0% { filter: none; }
+    25% { filter: brightness(3); background: #ff4400 !important; }
+    100% { filter: none; }
+}
+
+@keyframes missile-burst-expand {
+    0% { opacity: 1; transform: translate(-50%, -50%) scale(0.5); }
+    50% { opacity: 0.9; transform: translate(-50%, -50%) scale(4); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(6); }
+}
+
+/* --- Mine --- */
+.power-mine-place {
+    animation: power-mine-place-pulse 0.55s ease-out;
+}
+
+.power-mine-place::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: inherit;
+    border: 2px solid #ff2244;
+    box-shadow: 0 0 10px #ff0044;
+    animation: power-mine-place-ring 0.55s ease-out;
+    pointer-events: none;
+}
+
+.mine-explosion-ring {
+    position: absolute;
+    pointer-events: none;
+    z-index: 55;
+    transform: translate(-50%, -50%);
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 4px solid #ff4400;
+    box-shadow: 0 0 20px #ff2200, inset 0 0 15px #ff8800;
+    animation: mine-ring-expand 0.55s ease-out forwards;
+}
+
+.power-mine-blast {
+    animation: power-mine-blast-flash 0.45s ease-out;
+}
+
+@keyframes power-mine-place-pulse {
+    0%, 100% { filter: none; }
+    40% { filter: brightness(2) hue-rotate(-20deg); }
+}
+
+@keyframes power-mine-place-ring {
+    0% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1.6); }
+}
+
+@keyframes mine-ring-expand {
+    0% { opacity: 1; transform: translate(-50%, -50%) scale(0.4); }
+    60% { opacity: 0.8; transform: translate(-50%, -50%) scale(5); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(8); }
+}
+
+@keyframes power-mine-blast-flash {
+    0% { filter: none; }
+    30% { filter: brightness(2.5); background: #ff6600 !important; }
+    100% { filter: none; }
+}
+
+/* --- Canon OEN / Jammer --- */
+.power-jammer-source {
+    z-index: 25;
+    animation: power-jammer-source-pulse 0.6s ease-out;
+}
+
+.power-jammer-source::after {
+    content: '';
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
+    border: 2px solid #00e676;
+    pointer-events: none;
+    animation: power-jammer-wave-out 0.6s ease-out;
+}
+
+.jammer-wave-line {
+    position: absolute;
+    pointer-events: none;
+    z-index: 54;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, #00e676, #69f0ae, #00e676, transparent);
+    box-shadow: 0 0 8px #00e676;
+    transform-origin: left center;
+    animation: jammer-wave-travel 0.35s ease-out forwards;
+}
+
+@keyframes power-jammer-source-pulse {
+    0%, 100% { filter: none; }
+    30% { filter: brightness(1.8) hue-rotate(60deg); }
+}
+
+@keyframes power-jammer-wave-out {
+    0% { opacity: 1; transform: scale(0.5); }
+    100% { opacity: 0; transform: scale(2.5); }
+}
+
+@keyframes jammer-wave-travel {
+    0% { opacity: 0; transform: scaleX(0); }
+    30% { opacity: 1; }
+    100% { opacity: 0; transform: scaleX(1); }
+}
+
+/* --- Bouclier (absorption) --- */
+.power-shield-absorb {
+    z-index: 30;
+    animation: power-shield-absorb-pulse 0.55s ease-out;
+}
+
+.power-shield-absorb::before {
+    content: '';
+    position: absolute;
+    inset: -10px;
+    border-radius: 50%;
+    border: 3px solid #00e5ff;
+    box-shadow: 0 0 16px #00e5ff, inset 0 0 10px rgba(0, 229, 255, 0.5);
+    pointer-events: none;
+    animation: power-shield-ripple 0.55s ease-out;
+}
+
+@keyframes power-shield-absorb-pulse {
+    0%, 100% { filter: none; }
+    25% { filter: brightness(2); }
+}
+
+@keyframes power-shield-ripple {
+    0% { opacity: 1; transform: scale(0.6); }
+    100% { opacity: 0; transform: scale(2); }
 }
 
 #action-gauge {

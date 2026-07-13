@@ -2,6 +2,9 @@
 const gridSize = 22;
 const HUMAN_PLAYER_ID = 0;
 const BOT_MOVE_INTERVAL_MS = 130;
+const TELEPORT_MOVE_DELAY_MS = 165;
+const TELEPORT_EFFECT_MS = 320;
+const POWER_EFFECT_MS = 520;
 const gameContainer = document.getElementById('game-container');
 const playerColors = [
     "#7FFFD4", // vert d'eau (Aqua)
@@ -1106,11 +1109,12 @@ function getArrowSymbol(dir) {
 function consumeShield(player) {
     if (!player.shield) return;
     player.shield = false;
+    renderGrid();
+    setTimeout(() => playShieldAbsorbEffect(player), 0);
     if (player.id === HUMAN_PLAYER_ID) {
         updateActionDisplay(player);
         showDirectionControls(player);
     }
-    renderGrid();
 }
 
 function movePlayer(player) {
@@ -1310,6 +1314,7 @@ function activatePower(player, powerKey) {
     if (!player[powerKey] || player[`${powerKey}Used`]) return false;
 
     let success = true;
+    let mineCoords = null;
 
     switch (powerKey) {
         case 'teleporter':
@@ -1319,7 +1324,8 @@ function activatePower(player, powerKey) {
             activateJammer(player);
             break;
         case 'mine':
-            success = activateMine(player);
+            mineCoords = activateMine(player);
+            success = !!mineCoords;
             break;
         case 'boost':
             activateBoost(player);
@@ -1338,8 +1344,28 @@ function activatePower(player, powerKey) {
 
     player[`${powerKey}Used`] = true;
 
+    if (powerKey === 'teleporter') {
+        if (player.id === HUMAN_PLAYER_ID) {
+            showPowerControls(player);
+        }
+        return true;
+    }
+
     renderGrid();
     renderVehicleRoster();
+
+    setTimeout(() => {
+        if (powerKey === 'mine' && mineCoords) {
+            playMinePlaceEffect(mineCoords.x, mineCoords.y);
+        }
+        if (powerKey === 'boost') {
+            playBoostEffect(player);
+        }
+        if (powerKey === 'aerobrake') {
+            playAerobrakeEffect(player);
+        }
+    }, 0);
+
     if (player.id === HUMAN_PLAYER_ID) {
         updateActionDisplay(player);
         showDirectionControls(player);
@@ -1350,14 +1376,206 @@ function activatePower(player, powerKey) {
 
 
 
-function playMissileTrail(path, dx) {
+function getCellElement(x, y) {
+    return document.querySelector(`.cell[data-x="${x}"][data-y="${y}"]`);
+}
+
+function getCellCenterInContainer(x, y) {
+    const cell = getCellElement(x, y);
+    const container = document.getElementById('game-container');
+    if (!cell || !container) return null;
+
+    const cellRect = cell.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    const centerX = cellRect.left - containerRect.left + cellRect.width / 2;
+    const centerY = cellRect.top - containerRect.top + cellRect.height / 2;
+
+    return {
+        container,
+        x: centerX,
+        y: centerY,
+        fallDistance: centerY + 60,
+    };
+}
+
+function playCellEffect(x, y, className, duration = POWER_EFFECT_MS) {
+    const cell = getCellElement(x, y);
+    if (!cell) return;
+    cell.classList.add(className);
+    setTimeout(() => cell.classList.remove(className), duration);
+}
+
+function getCellInFront(player) {
+    let x = player.x;
+    let y = player.y;
+    if (player.dir === 'up') y = (player.y - 1 + gridSize) % gridSize;
+    if (player.dir === 'down') y = (player.y + 1) % gridSize;
+    if (player.dir === 'left') x = (player.x - 1 + gridSize) % gridSize;
+    if (player.dir === 'right') x = (player.x + 1) % gridSize;
+    return { x, y };
+}
+
+function getBrakeGradient(dir) {
+    switch (dir) {
+        case 'up': return 'to top';
+        case 'down': return 'to bottom';
+        case 'left': return 'to left';
+        case 'right': return 'to right';
+        default: return 'to top';
+    }
+}
+
+function playTeleportSkyStrike(x, y) {
+    const pos = getCellCenterInContainer(x, y);
+    if (!pos) return;
+
+    const strike = document.createElement('div');
+    strike.className = 'teleport-sky-strike';
+    strike.style.left = `${pos.x}px`;
+    strike.style.top = `${pos.y}px`;
+    strike.style.setProperty('--fall-distance', `${pos.fallDistance}px`);
+
+    const beam = document.createElement('div');
+    beam.className = 'teleport-sky-beam';
+    beam.style.setProperty('--beam-height', `${pos.fallDistance}px`);
+    beam.style.height = `${pos.fallDistance}px`;
+
+    const bolt = document.createElement('div');
+    bolt.className = 'teleport-sky-bolt';
+    bolt.style.setProperty('--fall-distance', `${pos.fallDistance}px`);
+
+    const flash = document.createElement('div');
+    flash.className = 'teleport-sky-flash';
+
+    const screenFlash = document.createElement('div');
+    screenFlash.className = 'teleport-screen-flash';
+    screenFlash.style.setProperty('--flash-x', `${pos.x}px`);
+    screenFlash.style.setProperty('--flash-y', `${pos.y}px`);
+
+    strike.appendChild(beam);
+    strike.appendChild(bolt);
+    strike.appendChild(flash);
+    pos.container.appendChild(screenFlash);
+    pos.container.appendChild(strike);
+
+    playCellEffect(x, y, 'teleport-cell-flash', TELEPORT_EFFECT_MS);
+    setTimeout(() => {
+        strike.remove();
+        screenFlash.remove();
+    }, TELEPORT_EFFECT_MS);
+}
+
+function playBoostEffect(player) {
+    playCellEffect(player.x, player.y, 'power-boost', 450);
+}
+
+function playAerobrakeEffect(player) {
+    const front = getCellInFront(player);
+    const behind = getWallBehind(player);
+    playCellEffect(player.x, player.y, 'power-aerobrake', 500);
+
+    const frontCell = getCellElement(front.x, front.y);
+    if (frontCell) {
+        frontCell.classList.add('power-aerobrake-front');
+        frontCell.style.setProperty('--brake-angle', getBrakeGradient(player.dir));
+        setTimeout(() => {
+            frontCell.classList.remove('power-aerobrake-front');
+            frontCell.style.removeProperty('--brake-angle');
+        }, 450);
+    }
+
+    playCellEffect(behind.x, behind.y, 'power-aerobrake-sparks', 450);
+}
+
+function playMissileLaunchEffect(x, y) {
+    playCellEffect(x, y, 'power-missile-launch', 350);
+}
+
+function playMissileExplosionEffect(x, y) {
+    const pos = getCellCenterInContainer(x, y);
+    if (pos) {
+        const burst = document.createElement('div');
+        burst.className = 'missile-explosion-burst';
+        burst.style.left = `${pos.x}px`;
+        burst.style.top = `${pos.y}px`;
+        pos.container.appendChild(burst);
+        setTimeout(() => burst.remove(), 450);
+    }
+    playCellEffect(x, y, 'power-missile-explosion', 500);
+}
+
+function playMinePlaceEffect(x, y) {
+    playCellEffect(x, y, 'power-mine-place', 550);
+}
+
+function playMineExplosionEffect(mineX, mineY) {
+    const pos = getCellCenterInContainer(mineX, mineY);
+    if (pos) {
+        const ring = document.createElement('div');
+        ring.className = 'mine-explosion-ring';
+        ring.style.left = `${pos.x}px`;
+        ring.style.top = `${pos.y}px`;
+        pos.container.appendChild(ring);
+        setTimeout(() => ring.remove(), 550);
+    }
+
+    for (let y = 0; y < gridSize; y++) {
+        for (let x = 0; x < gridSize; x++) {
+            if (torusChebyshevDist(mineX, mineY, x, y) <= MINE_EXPLOSION_RADIUS) {
+                playCellEffect(x, y, 'power-mine-blast', 450);
+            }
+        }
+    }
+}
+
+function playJammerEffect(fromX, fromY, toX, toY) {
+    playCellEffect(fromX, fromY, 'power-jammer-source', 600);
+
+    const fromPos = getCellCenterInContainer(fromX, fromY);
+    const toPos = getCellCenterInContainer(toX, toY);
+    if (fromPos && toPos) {
+        const dx = toPos.x - fromPos.x;
+        const dy = toPos.y - fromPos.y;
+        const length = Math.sqrt(dx * dx + dy * dy);
+        const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+
+        const wave = document.createElement('div');
+        wave.className = 'jammer-wave-line';
+        wave.style.left = `${fromPos.x}px`;
+        wave.style.top = `${fromPos.y}px`;
+        wave.style.width = `${length}px`;
+        wave.style.transform = `rotate(${angle}deg)`;
+        fromPos.container.appendChild(wave);
+        setTimeout(() => wave.remove(), 350);
+    }
+
+    const targetCell = getCellElement(toX, toY);
+    if (targetCell) {
+        targetCell.classList.add('power-jammer-hit');
+        setTimeout(() => targetCell.classList.remove('power-jammer-hit'), 800);
+    }
+}
+
+function playShieldAbsorbEffect(player) {
+    playCellEffect(player.x, player.y, 'power-shield-absorb', 550);
+}
+
+function playMissileTrail(path, dx, hitX, hitY) {
     const trailClass = dx !== 0 ? 'missile-trail-horizontal' : 'missile-trail-vertical';
+    const lastIndex = path.length - 1;
+
     path.forEach((pos, index) => {
         setTimeout(() => {
             const cell = document.querySelector(`.cell[data-x="${pos.x}"][data-y="${pos.y}"]`);
             if (!cell) return;
             cell.classList.add(trailClass);
             setTimeout(() => cell.classList.remove(trailClass), 600);
+
+            if (index === lastIndex) {
+                setTimeout(() => {
+                    playMissileExplosionEffect(hitX ?? pos.x, hitY ?? pos.y);
+                }, 80);
+            }
         }, index * 120);
     });
 }
@@ -1374,6 +1592,8 @@ function activateMissile(player) {
     if (player.dir === 'right') dx = 1;
 
     const trailPath = [];
+    let hitX = null;
+    let hitY = null;
 
     for (let i = 0; i < 4; i++) {
         x = (x + dx + gridSize) % gridSize;
@@ -1381,6 +1601,8 @@ function activateMissile(player) {
         trailPath.push({ x, y });
 
         if (grid[y][x].type === 'wall' || grid[y][x].type === 'mine' || grid[y][x].type === 'player' || grid[y][x].type === 'crash') {
+            hitX = x;
+            hitY = y;
             const target = grid[y][x];
             if (target.type === 'player') {
                 const targetPlayer = players[target.playerId];
@@ -1397,7 +1619,8 @@ function activateMissile(player) {
         }
     }
 
-    playMissileTrail(trailPath, dx);
+    playMissileLaunchEffect(player.x, player.y);
+    setTimeout(() => playMissileTrail(trailPath, dx, hitX, hitY), 0);
 }
 
 function activateAerobrake(player) {
@@ -1409,23 +1632,38 @@ function activateAerobrake(player) {
     }
 }
 
+function playTeleportCellEffect(x, y) {
+    playTeleportSkyStrike(x, y);
+}
 
 function activateTeleporter(player) {
+    const fromX = player.x;
+    const fromY = player.y;
+
     let newX, newY;
     do {
         newX = Math.floor(Math.random() * gridSize);
         newY = Math.floor(Math.random() * gridSize);
     } while (grid[newY][newX].type !== "empty");
 
-    grid[player.y][player.x] = { type: "empty", playerId: null };
-    player.x = newX;
-    player.y = newY;
-    grid[player.y][player.x] = { type: "player", playerId: player.id };
+    playTeleportCellEffect(fromX, fromY);
 
-    updateMinesAfterMove(player);
-    if (player.id === HUMAN_PLAYER_ID) {
-        showDirectionControls(player);
-    }
+    setTimeout(() => {
+        grid[player.y][player.x] = { type: "empty", playerId: null };
+        player.x = newX;
+        player.y = newY;
+        grid[player.y][player.x] = { type: "player", playerId: player.id };
+
+        updateMinesAfterMove(player);
+        renderGrid();
+        playTeleportCellEffect(newX, newY);
+        renderVehicleRoster();
+
+        if (player.id === HUMAN_PLAYER_ID) {
+            showDirectionControls(player);
+            updateActionDisplay(player);
+        }
+    }, TELEPORT_MOVE_DELAY_MS);
 }
 
 
@@ -1454,13 +1692,9 @@ function activateJammer(player) {
     closestPlayer.latence = JAMMER_LATENCE;
     closestPlayer.jammedUntil = Date.now() + 800;
 
-    const cell = document.querySelector(
-        `.cell[data-x="${closestPlayer.x}"][data-y="${closestPlayer.y}"]`
-    );
-    if (cell) {
-        cell.classList.add('jammer-hit');
-        setTimeout(() => cell.classList.remove('jammer-hit'), 800);
-    }
+    const targetX = closestPlayer.x;
+    const targetY = closestPlayer.y;
+    setTimeout(() => playJammerEffect(player.x, player.y, targetX, targetY), 0);
 
     if (closestPlayer.id === HUMAN_PLAYER_ID) {
         updateActionDisplay(closestPlayer);
@@ -1513,7 +1747,7 @@ function activateMine(player) {
         active: false,
     };
 
-    return true;
+    return { x: mineX, y: mineY };
 }
 
 function updateMinesAfterMove(movedPlayer) {
@@ -1579,6 +1813,7 @@ function explodeMine(mineX, mineY) {
     }
 
     renderGrid();
+    setTimeout(() => playMineExplosionEffect(mineX, mineY), 0);
     if (!gameOver && players[HUMAN_PLAYER_ID].alive) {
         showDirectionControls(players[HUMAN_PLAYER_ID]);
     }
