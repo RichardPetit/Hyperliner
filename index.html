@@ -18,15 +18,29 @@
     </div>
     <div id="game-ui" class="game-ui-hidden">
     <div id="main-layout">
-        <div id="game-container"></div>
+        <div id="game-column">
+            <div id="game-container"></div>
+            <div id="controls"></div>
+            <p class="controls-hint">Flèches du clavier pour vous déplacer</p>
+            <div id="power-controls"></div>
+        </div>
         <div id="side-panel">
             <div id="action-gauge"></div>
             <div id="vehicle-roster"></div>
         </div>
     </div>
-    <div id="controls"></div>
-    <p class="controls-hint">Flèches du clavier pour vous déplacer</p>
-    <div id="power-controls"></div>
+    </div>
+    <button type="button" id="toggle-results-btn" class="results-toggle hidden">Masquer le classement</button>
+    <div id="end-screen" class="hidden">
+        <div class="setup-panel end-panel">
+            <h2 id="end-title" class="setup-title"></h2>
+            <p id="end-subtitle" class="setup-hint"></p>
+            <div id="end-leaderboard" class="end-leaderboard"></div>
+            <div class="end-actions">
+                <button type="button" id="replay-btn" class="start-game-btn">Rejouer</button>
+                <button type="button" id="menu-btn" class="menu-btn">Changer de véhicule</button>
+            </div>
+        </div>
     </div>
 
 
