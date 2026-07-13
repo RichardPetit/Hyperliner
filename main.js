@@ -1,6 +1,7 @@
 ﻿// main.js
 const gridSize = 22;
 const HUMAN_PLAYER_ID = 0;
+const BOT_MOVE_INTERVAL_MS = 130;
 const gameContainer = document.getElementById('game-container');
 const playerColors = [
     "#7FFFD4", // vert d'eau (Aqua)
@@ -171,6 +172,8 @@ function selectSetupVehicle(vehicleId) {
 function startGame() {
     if (gameStarted) return;
     gameStarted = true;
+    pendingBotMoves.length = 0;
+    lastBotMoveAt = 0;
 
     const setupScreen = document.getElementById('setup-screen');
     const gameUi = document.getElementById('game-ui');
@@ -490,12 +493,15 @@ initSetupScreen();
 renderGrid();
 renderVehicleRoster();
 
+function getSafeDirections(player) {
+    return getPossibleDirections(player).filter(dir => isDirectionSafe(player, dir));
+}
+
 function showDirectionControls(player) {
     const controls = document.getElementById('controls');
     controls.innerHTML = '';
 
-    const possibleDirections = getPossibleDirections(player);
-    const safeDirections = possibleDirections.filter(dir => isDirectionSafe(player, dir));
+    const safeDirections = getSafeDirections(player);
 
     safeDirections.forEach(direction => {
         const btn = document.createElement('button');
@@ -505,6 +511,30 @@ function showDirectionControls(player) {
         controls.appendChild(btn);
     });
 }
+
+const KEY_DIRECTIONS = {
+    ArrowUp: 'up',
+    ArrowDown: 'down',
+    ArrowLeft: 'left',
+    ArrowRight: 'right',
+};
+
+function handleKeyboardInput(event) {
+    if (!gameStarted) return;
+
+    const direction = KEY_DIRECTIONS[event.key];
+    if (!direction) return;
+
+    const player = players[HUMAN_PLAYER_ID];
+    if (!player.alive) return;
+
+    if (!getSafeDirections(player).includes(direction)) return;
+
+    event.preventDefault();
+    handleDirectionClick(direction);
+}
+
+document.addEventListener('keydown', handleKeyboardInput);
 
 function getWallBehind(player) {
     let wallX = player.x;
@@ -673,31 +703,70 @@ function botAutoMove(player) {
     movePlayer(player);
 }
 
+const pendingBotMoves = [];
+let lastBotMoveAt = 0;
+
+function isBotQueued(playerId) {
+    return pendingBotMoves.some(entry => entry.playerId === playerId);
+}
+
+function scheduleBotMove(player, type) {
+    if (!player.alive || isBotQueued(player.id)) return;
+    pendingBotMoves.push({ playerId: player.id, type });
+}
+
+function performBotDecidedMove(player) {
+    executePlayerMove(player, chooseBotDirection(player));
+}
+
+function processBotMoveQueue(now) {
+    if (!gameStarted || pendingBotMoves.length === 0) return false;
+    if (now - lastBotMoveAt < BOT_MOVE_INTERVAL_MS) return false;
+
+    const entry = pendingBotMoves.shift();
+    const player = players[entry.playerId];
+    if (!player || !player.alive) {
+        return processBotMoveQueue(now);
+    }
+
+    if (entry.type === 'auto') {
+        botAutoMove(player);
+    } else {
+        performBotDecidedMove(player);
+    }
+
+    lastBotMoveAt = now;
+    renderGrid();
+    const human = players[HUMAN_PLAYER_ID];
+    if (human.alive) showDirectionControls(human);
+    return true;
+}
+
 function maybeBotAct(player) {
     const vehicle = VEHICLES[player.vehicleId];
-    if (player.actionGauge <= 0) return;
+    if (player.actionGauge <= 0 || isBotQueued(player.id)) return;
 
     const straightSafe = isDirectionSafe(player, player.dir);
 
     if (!straightSafe) {
-        executePlayerMove(player, chooseBotDirection(player));
+        scheduleBotMove(player, 'decide');
         return;
     }
 
     if (player.actionGauge >= vehicle.maxActionGauge - 1) {
-        executePlayerMove(player, chooseBotDirection(player));
+        scheduleBotMove(player, 'decide');
         return;
     }
 
     const bestDir = chooseBotDirection(player);
     const straightSpace = countOpenSpace(player.x, player.y, player.dir);
     if (bestDir !== player.dir && player.latence === 0 && straightSpace <= 3) {
-        executePlayerMove(player, bestDir);
+        scheduleBotMove(player, 'decide');
         return;
     }
 
     if (Math.random() < 0.04 && player.actionGauge > 2) {
-        executePlayerMove(player, chooseBotDirection(player));
+        scheduleBotMove(player, 'decide');
     }
 }
 
@@ -793,7 +862,7 @@ function rechargeActions() {
     if (!gameStarted) return;
 
     const now = Date.now();
-    let needsRender = false;
+    let humanNeedsRender = false;
     const human = players[HUMAN_PLAYER_ID];
 
     players.forEach(player => {
@@ -809,7 +878,6 @@ function rechargeActions() {
                 updateActionDisplay(player);
             } else {
                 maybeBotAct(player);
-                needsRender = true;
             }
             return;
         }
@@ -820,15 +888,17 @@ function rechargeActions() {
                 movePlayer(player);
                 showDirectionControls(player);
                 updateActionDisplay(player);
+                humanNeedsRender = true;
             } else {
-                botAutoMove(player);
+                scheduleBotMove(player, 'auto');
             }
             player.lastActionTime = now;
-            needsRender = true;
         }
     });
 
-    if (needsRender) {
+    const botMoved = processBotMoveQueue(now);
+
+    if (humanNeedsRender && !botMoved) {
         renderGrid();
         if (human.alive) showDirectionControls(human);
     }
