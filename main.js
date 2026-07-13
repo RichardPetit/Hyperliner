@@ -168,6 +168,166 @@ let gameOver = false;
 let endScreenVisible = true;
 let inspectedPlayerId = HUMAN_PLAYER_ID;
 
+const TUTORIAL_STORAGE_KEY = 'hyperliner-tuto-seen';
+let tutorialStepIndex = 0;
+
+const TUTORIAL_STEPS = [
+    {
+        title: 'Bienvenue dans Hyperliner',
+        html: `
+            <p>Vous pilotez un vaisseau sur une <strong>grille 22×22</strong> contre 7 adversaires (bots).</p>
+            <p><strong>Objectif :</strong> être le dernier survivant et marquer le plus de <strong>frags</strong> possible.</p>
+            <p>Chaque véhicule laisse une <strong>traînée</strong> (mur gris) derrière lui. Toucher un mur, une mine ou un adversaire vous élimine.</p>
+            <p>La carte est <strong>circulaire</strong> : sortir d'un bord vous fait réapparaître de l'autre côté.</p>`,
+    },
+    {
+        title: 'Se déplacer',
+        html: `
+            <p>Votre vaisseau avance <strong>automatiquement</strong> quand la jauge <strong>Actions</strong> (panneau de droite) est pleine.</p>
+            <p>La jauge se recharge avec le temps — plus vite ou plus lentement selon le véhicule.</p>
+            <ul>
+                <li>Utilisez les <strong>flèches à l'écran</strong> ou du <strong>clavier</strong> pour choisir une direction sûre.</li>
+                <li>Seules les directions sans danger immédiat sont proposées.</li>
+                <li>Vous ne pouvez pas faire demi-tour sur place.</li>
+            </ul>`,
+    },
+    {
+        title: 'Latence et virages',
+        html: `
+            <p>Changer de direction impose une <strong>latence</strong> : pendant quelques ticks, vous ne pouvez pas tourner à nouveau.</p>
+            <p>La latence s'affiche en <strong>rouge</strong> sous la jauge d'actions. Chaque véhicule a sa propre durée de virage.</p>
+            <p>Anticipez vos trajectoires : un mauvais virage peut vous envoyer dans un mur ou un piège adverse.</p>`,
+    },
+    {
+        title: 'Pouvoirs spéciaux',
+        html: `
+            <p>Chaque vaisseau dispose de <strong>bonus uniques</strong>, utilisables <strong>une fois par partie</strong> (boutons sous la carte).</p>
+            <div class="tuto-powers-grid">
+                <div class="tuto-power-item"><span>Boost</span> — +3 actions ou avance forcée si la jauge est pleine.</div>
+                <div class="tuto-power-item"><span>Aérofrein</span> — annule la latence et vide la jauge d'actions.</div>
+                <div class="tuto-power-item"><span>Missile</span> — projectile en ligne droite (4 cases).</div>
+                <div class="tuto-power-item"><span>Mine</span> — transforme le mur derrière vous ; explosion si un ennemi s'approche.</div>
+                <div class="tuto-power-item"><span>Téléporteur</span> — saut instantané vers une case libre aléatoire.</div>
+                <div class="tuto-power-item"><span>Canon OEN</span> — inflige de la latence à l'adversaire le plus proche.</div>
+                <div class="tuto-power-item"><span>Bouclier</span> — passif : absorbe automatiquement un mur, une mine ou un missile.</div>
+            </div>`,
+    },
+    {
+        title: 'Lire la partie',
+        html: `
+            <ul>
+                <li><strong>Panneau de droite</strong> — jauge d'actions, latence et pouvoirs du véhicule inspecté.</li>
+                <li><strong>Cliquez un adversaire</strong> sur la carte ou dans la liste pour espionner sa jauge.</li>
+                <li><strong>Frags</strong> — comptés quand vous éliminez un adversaire (crash, missile, mine…).</li>
+                <li><strong>Fin de partie</strong> — classement affichable ou masquable pour continuer à observer la carte.</li>
+            </ul>
+            <p>Choisissez votre vaisseau, lancez la partie et bonne chance !</p>`,
+    },
+];
+
+function renderTutorialStep() {
+    const step = TUTORIAL_STEPS[tutorialStepIndex];
+    const title = document.getElementById('tuto-title');
+    const body = document.getElementById('tuto-body');
+    const indicator = document.getElementById('tuto-step-indicator');
+    const prevBtn = document.getElementById('tuto-prev-btn');
+    const nextBtn = document.getElementById('tuto-next-btn');
+    const skipBtn = document.getElementById('tuto-skip-btn');
+
+    if (!step || !title || !body) return;
+
+    title.textContent = step.title;
+    body.innerHTML = step.html;
+    if (indicator) {
+        indicator.textContent = `Étape ${tutorialStepIndex + 1} / ${TUTORIAL_STEPS.length}`;
+    }
+    if (prevBtn) prevBtn.disabled = tutorialStepIndex === 0;
+    if (nextBtn) {
+        nextBtn.textContent = tutorialStepIndex === TUTORIAL_STEPS.length - 1 ? 'C\'est parti !' : 'Suivant';
+    }
+    if (skipBtn) {
+        skipBtn.textContent = tutorialStepIndex === TUTORIAL_STEPS.length - 1 ? 'Fermer' : 'Passer';
+    }
+}
+
+function openTutorial(stepIndex = 0) {
+    tutorialStepIndex = Math.max(0, Math.min(stepIndex, TUTORIAL_STEPS.length - 1));
+    renderTutorialStep();
+    const overlay = document.getElementById('tutorial-overlay');
+    if (overlay) overlay.classList.remove('hidden');
+}
+
+function closeTutorial(markSeen = true) {
+    const overlay = document.getElementById('tutorial-overlay');
+    if (overlay) overlay.classList.add('hidden');
+    if (markSeen) {
+        try {
+            localStorage.setItem(TUTORIAL_STORAGE_KEY, '1');
+        } catch (_) { /* ignore */ }
+    }
+}
+
+function initTutorial() {
+    const prevBtn = document.getElementById('tuto-prev-btn');
+    const nextBtn = document.getElementById('tuto-next-btn');
+    const skipBtn = document.getElementById('tuto-skip-btn');
+    const openBtn = document.getElementById('open-tuto-btn');
+    const helpBtn = document.getElementById('help-btn');
+    const overlay = document.getElementById('tutorial-overlay');
+
+    if (prevBtn) {
+        prevBtn.onclick = () => {
+            if (tutorialStepIndex > 0) {
+                tutorialStepIndex--;
+                renderTutorialStep();
+            }
+        };
+    }
+
+    if (nextBtn) {
+        nextBtn.onclick = () => {
+            if (tutorialStepIndex < TUTORIAL_STEPS.length - 1) {
+                tutorialStepIndex++;
+                renderTutorialStep();
+            } else {
+                closeTutorial(true);
+            }
+        };
+    }
+
+    if (skipBtn) {
+        skipBtn.onclick = () => closeTutorial(true);
+    }
+
+    if (openBtn) openBtn.onclick = () => openTutorial(0);
+    if (helpBtn) helpBtn.onclick = () => openTutorial(0);
+
+    if (overlay) {
+        overlay.onclick = (event) => {
+            if (event.target === overlay) closeTutorial(true);
+        };
+    }
+
+    let seen = false;
+    try {
+        seen = !!localStorage.getItem(TUTORIAL_STORAGE_KEY);
+    } catch (_) { /* ignore */ }
+
+    if (!seen) {
+        openTutorial(0);
+    }
+}
+
+function updateHelpButtonVisibility() {
+    const helpBtn = document.getElementById('help-btn');
+    const setupScreen = document.getElementById('setup-screen');
+    if (!helpBtn) return;
+
+    const setupVisible = setupScreen && !setupScreen.classList.contains('hidden');
+    const showHelp = gameStarted || setupVisible;
+    helpBtn.classList.toggle('hidden', !showHelp);
+}
+
 function initSetupScreen() {
     const container = document.getElementById('vehicle-choices');
     if (!container) return;
@@ -216,6 +376,7 @@ function startGame() {
     updateActionDisplay(players[HUMAN_PLAYER_ID]);
     showDirectionControls(players[HUMAN_PLAYER_ID]);
     showPowerControls(players[HUMAN_PLAYER_ID]);
+    updateHelpButtonVisibility();
 }
 
 function setHumanVehicle(vehicleId) {
@@ -669,6 +830,7 @@ function returnToMenu() {
     const setupScreen = document.getElementById('setup-screen');
     if (gameUi) gameUi.classList.add('game-ui-hidden');
     if (setupScreen) setupScreen.classList.remove('hidden');
+    updateHelpButtonVisibility();
 }
 
 function initEndScreen() {
@@ -706,7 +868,9 @@ for (let y = 0; y < gridSize; y++) {
 placePlayersOnGrid();
 
 initSetupScreen();
+initTutorial();
 initEndScreen();
+updateHelpButtonVisibility();
 renderGrid();
 renderVehicleRoster();
 

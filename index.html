@@ -8,10 +8,24 @@
 </head>
 <body>
     <h1 class="title">Hyperliner</h1>
+    <button type="button" id="help-btn" class="help-btn hidden" title="Comment jouer">?</button>
+    <div id="tutorial-overlay" class="hidden">
+        <div class="setup-panel tutorial-panel">
+            <p id="tuto-step-indicator" class="tuto-step-indicator"></p>
+            <h2 id="tuto-title" class="setup-title"></h2>
+            <div id="tuto-body" class="tuto-body"></div>
+            <div class="tuto-actions">
+                <button type="button" id="tuto-prev-btn" class="menu-btn tuto-nav-btn">Précédent</button>
+                <button type="button" id="tuto-skip-btn" class="menu-btn tuto-skip-btn">Passer</button>
+                <button type="button" id="tuto-next-btn" class="start-game-btn tuto-nav-btn">Suivant</button>
+            </div>
+        </div>
+    </div>
     <div id="setup-screen">
         <div class="setup-panel">
             <h2 class="setup-title">Choisissez votre véhicule</h2>
             <p class="setup-hint">Sélectionnez un vaisseau puis lancez la partie.</p>
+            <button type="button" id="open-tuto-btn" class="menu-btn tuto-open-btn">Comment jouer ?</button>
             <div id="vehicle-choices" class="vehicle-choices"></div>
             <button type="button" id="start-game-btn" class="start-game-btn">Commencer la partie</button>
         </div>
