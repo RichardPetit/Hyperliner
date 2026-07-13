@@ -141,6 +141,131 @@ body {
     display: none;
 }
 
+#tutorial-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 115;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(45, 6, 54, 0.94);
+    padding: 20px;
+}
+
+#tutorial-overlay.hidden {
+    display: none;
+}
+
+.tutorial-panel {
+    max-width: 640px;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+}
+
+.tuto-step-indicator {
+    margin: 0 0 6px;
+    text-align: center;
+    font-size: 0.8rem;
+    color: #888;
+    letter-spacing: 0.04em;
+}
+
+.tuto-body {
+    color: #ddd;
+    font-size: 0.92rem;
+    line-height: 1.55;
+    margin-bottom: 22px;
+}
+
+.tuto-body p {
+    margin: 0 0 12px;
+}
+
+.tuto-body ul {
+    margin: 0 0 12px;
+    padding-left: 20px;
+}
+
+.tuto-body li {
+    margin-bottom: 6px;
+}
+
+.tuto-body strong {
+    color: #7FFFD4;
+}
+
+.tuto-powers-grid {
+    display: grid;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.tuto-power-item {
+    padding: 8px 10px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
+    font-size: 0.85rem;
+}
+
+.tuto-power-item span {
+    color: #7FFFD4;
+    font-weight: bold;
+}
+
+.tuto-actions {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 10px;
+    align-items: center;
+}
+
+.tuto-nav-btn {
+    width: 100%;
+}
+
+.tuto-skip-btn {
+    width: auto;
+    min-width: 100px;
+    justify-self: center;
+    font-size: 0.85rem;
+    padding: 10px 14px;
+}
+
+.tuto-nav-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.tuto-open-btn {
+    margin-bottom: 18px;
+}
+
+.help-btn {
+    position: fixed;
+    top: 18px;
+    right: 18px;
+    z-index: 120;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid #7FFFD4;
+    background: rgba(26, 10, 34, 0.92);
+    color: #7FFFD4;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+    transition: background 0.2s;
+}
+
+.help-btn:hover {
+    background: rgba(127, 255, 212, 0.15);
+}
+
+.help-btn.hidden {
+    display: none;
+}
+
 #end-screen {
     position: fixed;
     inset: 0;
