@@ -21,6 +21,8 @@ const wallShadow = (color) => `0 0 8px 2px ${color}, 0 0 2px #fff`;
 
 const ISO_TILE_W = 40;
 const ISO_TILE_H = 20;
+const MISSILE_SPRITE_DIR = 'assets/grid/DefineSprite_201_mcMissile';
+const MISSILE_STEP_MS = 95;
 
 function isoCellPosition(x, y) {
     const offsetX = (gridSize - 1) * (ISO_TILE_W / 2);
@@ -139,7 +141,17 @@ function renderGrid() {
                 cell.style.boxShadow = `0 0 6px 2px ${player.color}`;
                 cell.style.filter = `drop-shadow(0 0 4px ${player.color})`;
             } else if (cellState.type === 'crash') {
-                /* Marqueur logique éphémère — l'effet visuel est géré par playFragExplosionEffect */
+                cell.classList.add('crash');
+                cell.style.setProperty('--crash-color', cellState.color || '#c62828');
+                cell.style.zIndex = pos.zIndex + gridSize;
+                if (cellState.onWall && cellState.blocking) {
+                    cell.classList.add('crash-on-wall');
+                    const wallOwner = players[cellState.playerId];
+                    if (wallOwner) {
+                        cell.style.boxShadow = `0 0 6px 2px ${wallOwner.color}`;
+                        cell.style.filter = `drop-shadow(0 0 4px ${wallOwner.color})`;
+                    }
+                }
             } else if (cellState.type === 'mine') {
                 const owner = players[cellState.playerId];
                 cell.classList.add('wall', 'mine-wall');
@@ -576,23 +588,23 @@ const MINE_EXPLOSION_RADIUS = 4;
  * Numérotation interne Flash — différente des png/bike_N.png de la boutique.
  */
 const VEHICLE_BIKE_MODEL = {
-    cormoran: 2,
-    banshee: 4,
+    cormoran: 4,
+    banshee: 20,
     psionide: 8,
-    mightyduck: 3,
+    mightyduck: 5,
     kortex: 10,
-    snypase: 7,
-    eclipse: 11,
-    chimera: 6,
-    cougar: 3,
-    bison: 6,
-    vulture: 19,
-    firefly: 6,
-    tomahawk: 9,
+    snypase: 6,
+    eclipse: 3,
+    chimera: 18,
+    cougar: 7,
+    bison: 19,
+    vulture: 11,
+    firefly: 11,
+    tomahawk: 21,
 };
 
-/** Véhicules avec 4 frames directionnelles (DefineSprite_* / 1–4) */
-const BIKE_HAS_DIRECTIONS = new Set([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 18, 19, 20, 21]);
+/** Véhicules avec 4 frames directionnelles dans assets/grid/bike_N/ */
+const BIKE_HAS_DIRECTIONS = new Set([3, 4, 5, 6, 7, 8, 10, 11, 18, 19, 20, 21]);
 
 function getGridSpritePath(vehicleId, dir = 'right') {
     const bike = VEHICLE_BIKE_MODEL[vehicleId] ?? 11;
@@ -1047,8 +1059,37 @@ function torusChebyshevDist(x1, y1, x2, y2) {
     return Math.max(torusDelta(x1, x2), torusDelta(y1, y2));
 }
 
+function isPassableCell(x, y) {
+    const cell = grid[y][x];
+    if (cell.type === 'empty') return true;
+    if (cell.type === 'crash' && !cell.blocking) return true;
+    return false;
+}
+
+function isBlockingAt(x, y) {
+    const cell = grid[y][x];
+    if (cell.type === 'wall' || cell.type === 'mine') return true;
+    if (cell.type === 'crash' && cell.blocking) return true;
+    return false;
+}
+
 function isBlockingCell(type) {
     return type === 'wall' || type === 'mine';
+}
+
+function clearCellAt(x, y) {
+    grid[y][x] = { type: 'empty', playerId: null };
+}
+
+function isShieldBreakableAt(x, y) {
+    const cell = grid[y][x];
+    if (cell.type === 'wall' || cell.type === 'mine') return true;
+    if (cell.type === 'crash') return true;
+    return false;
+}
+
+function getWallOwnerId(cell) {
+    return cell.ownerId ?? cell.playerId ?? null;
 }
 
 function getNextPosition(x, y, direction) {
@@ -1073,10 +1114,9 @@ function getPossibleDirections(player) {
 
 function isDirectionSafe(player, direction) {
     const { x: nextX, y: nextY } = getNextPosition(player.x, player.y, direction);
-    const nextType = grid[nextY][nextX].type;
 
-    if (nextType === "empty") return true;
-    if (player.shield && isBlockingCell(nextType)) return true;
+    if (isPassableCell(nextX, nextY)) return true;
+    if (player.shield && isShieldBreakableAt(nextX, nextY)) return true;
 
     if ((direction === 'up' && player.dir === 'down') ||
         (direction === 'down' && player.dir === 'up') ||
@@ -1094,7 +1134,7 @@ function countOpenSpace(x, y, direction) {
     let count = 0;
     for (let i = 0; i < gridSize; i++) {
         const next = getNextPosition(cx, cy, direction);
-        if (grid[next.y][next.x].type !== "empty") break;
+        if (!isPassableCell(next.x, next.y)) break;
         count++;
         cx = next.x;
         cy = next.y;
@@ -1230,7 +1270,7 @@ function scanForward(player, maxDist = 4) {
         x = (x + dx + gridSize) % gridSize;
         y = (y + dy + gridSize) % gridSize;
         const cell = grid[y][x];
-        if (cell.type !== 'empty') {
+        if (!isPassableCell(x, y)) {
             return { x, y, type: cell.type, dist: i + 1, playerId: cell.playerId };
         }
     }
@@ -1269,7 +1309,7 @@ function chooseBotPower(player) {
 
     if (canUsePower(player, 'missile') && forward) {
         if (forward.type === 'player') return 'missile';
-        if ((forward.type === 'wall' || forward.type === 'mine') && straightSpace <= 2) {
+        if ((forward.type === 'wall' || forward.type === 'mine' || forward.type === 'crash') && straightSpace <= 2) {
             return 'missile';
         }
     }
@@ -1401,9 +1441,10 @@ function movePlayer(player) {
     if (player.dir === 'left') nextX = (player.x - 1 + gridSize) % gridSize;
     if (player.dir === 'right') nextX = (player.x + 1) % gridSize;
 
-    const targetType = grid[nextY][nextX].type;
+    const targetCell = grid[nextY][nextX];
+    const targetType = targetCell.type;
 
-    if (targetType === "wall" && player.shield) {
+    if (player.shield && isShieldBreakableAt(nextX, nextY)) {
         grid[nextY][nextX] = { type: "empty", playerId: null };
         consumeShield(player);
         grid[player.y][player.x] = { type: "wall", playerId: player.id };
@@ -1415,9 +1456,7 @@ function movePlayer(player) {
         return;
     }
 
-    if (targetType === "mine" && player.shield) {
-        grid[nextY][nextX] = { type: "empty", playerId: null };
-        consumeShield(player);
+    if (isPassableCell(nextX, nextY)) {
         grid[player.y][player.x] = { type: "wall", playerId: player.id };
         player.x = nextX;
         player.y = nextY;
@@ -1427,38 +1466,36 @@ function movePlayer(player) {
         return;
     }
 
-    if (targetType !== "empty") {
-        if (isBlockingCell(targetType) || targetType === "player" || targetType === "crash") {
-            if (targetType === "player") {
-                const otherPlayerId = grid[nextY][nextX].playerId;
-                const hitColor = players[otherPlayerId]?.color || player.color;
-                grid[player.y][player.x] = { type: "wall", playerId: player.id };
-                grid[nextY][nextX] = { type: "empty", playerId: null };
-                playFragExplosionEffect(nextX, nextY, hitColor);
-                eliminatePlayer(otherPlayerId, player.id);
-                eliminatePlayer(player.id);
-            } else {
-                const obstacleOwnerId = grid[nextY][nextX].ownerId ?? grid[nextY][nextX].playerId;
-                const killerId = obstacleOwnerId !== player.id ? obstacleOwnerId : null;
-                grid[player.y][player.x] = { type: "wall", playerId: player.id };
-                grid[nextY][nextX] = { type: "empty", playerId: null };
-                playFragExplosionEffect(nextX, nextY, player.color);
-                eliminatePlayer(player.id, killerId);
-            }
-
-            renderGrid();
-            return;
-        }
+    if (targetType === "player") {
+        const otherPlayerId = targetCell.playerId;
+        const hitColor = players[otherPlayerId]?.color || player.color;
+        grid[player.y][player.x] = { type: "wall", playerId: player.id };
+        markCrashAt(nextX, nextY, {
+            color: hitColor,
+            blocking: true,
+            onWall: true,
+            wallOwnerId: player.id,
+        });
+        eliminatePlayer(otherPlayerId, player.id);
+        eliminatePlayer(player.id);
+        renderGrid();
+        return;
     }
 
-    grid[player.y][player.x] = { type: "wall", playerId: player.id };
-
-    player.x = nextX;
-    player.y = nextY;
-    grid[player.y][player.x] = { type: "player", playerId: player.id };
-
-    if (player.latence > 0) player.latence--;
-    updateMinesAfterMove(player);
+    if (isBlockingAt(nextX, nextY)) {
+        const obstacleOwnerId = getWallOwnerId(targetCell);
+        const killerId = obstacleOwnerId !== player.id ? obstacleOwnerId : null;
+        grid[player.y][player.x] = { type: "wall", playerId: player.id };
+        markCrashAt(nextX, nextY, {
+            color: player.color,
+            blocking: true,
+            onWall: targetType === 'wall' || targetType === 'mine' || (targetType === 'crash' && targetCell.blocking),
+            wallOwnerId: obstacleOwnerId,
+        });
+        eliminatePlayer(player.id, killerId);
+        renderGrid();
+        return;
+    }
 }
 
 function rechargeActions() {
@@ -1661,6 +1698,17 @@ function getCellElement(x, y) {
 
 const FRAG_EXPLOSION_MS = 700;
 
+function markCrashAt(x, y, { color = '#c62828', blocking = false, onWall = false, wallOwnerId = null } = {}) {
+    playFragExplosionEffect(x, y, color);
+    grid[y][x] = {
+        type: 'crash',
+        playerId: wallOwnerId,
+        color,
+        onWall: blocking && onWall,
+        blocking,
+    };
+}
+
 function playFragExplosionEffect(x, y, color = '#ff6600') {
     const pos = getCellCenterInContainer(x, y);
     if (!pos) return;
@@ -1789,21 +1837,40 @@ function playAerobrakeEffect(player) {
     playCellEffect(behind.x, behind.y, 'power-aerobrake-sparks', 450);
 }
 
-function playMissileLaunchEffect(x, y) {
-    playCellEffect(x, y, 'power-missile-launch', 350);
+function playMissileExplosionEffect(x, y) {
+    playFragExplosionEffect(x, y, '#ff6600');
 }
 
-function playMissileExplosionEffect(x, y) {
-    const pos = getCellCenterInContainer(x, y);
-    if (pos) {
-        const burst = document.createElement('div');
-        burst.className = 'missile-explosion-burst';
-        burst.style.left = `${pos.x}px`;
-        burst.style.top = `${pos.y}px`;
-        pos.container.appendChild(burst);
-        setTimeout(() => burst.remove(), 450);
-    }
-    playCellEffect(x, y, 'power-missile-explosion', 500);
+function playMissileTrail(path, dir, originX, originY, hitX, hitY) {
+    const container = document.getElementById('game-container');
+    if (!container) return;
+
+    const missile = document.createElement('img');
+    missile.className = 'missile-sprite';
+    missile.src = `${MISSILE_SPRITE_DIR}/${dir}.png`;
+    missile.alt = '';
+    container.appendChild(missile);
+
+    const positions = [{ x: originX, y: originY }, ...path];
+
+    positions.forEach((pos, index) => {
+        setTimeout(() => {
+            const center = getCellCenterInContainer(pos.x, pos.y);
+            if (!center) return;
+
+            missile.style.left = `${center.x}px`;
+            missile.style.top = `${center.y - 12}px`;
+
+            if (index === positions.length - 1) {
+                setTimeout(() => {
+                    if (hitX != null && hitY != null) {
+                        playMissileExplosionEffect(hitX, hitY);
+                    }
+                    missile.remove();
+                }, MISSILE_STEP_MS * 0.6);
+            }
+        }, index * MISSILE_STEP_MS);
+    });
 }
 
 function playMinePlaceEffect(x, y) {
@@ -1862,26 +1929,6 @@ function playShieldAbsorbEffect(player) {
     playCellEffect(player.x, player.y, 'power-shield-absorb', 550);
 }
 
-function playMissileTrail(path, dx, hitX, hitY) {
-    const trailClass = dx !== 0 ? 'missile-trail-horizontal' : 'missile-trail-vertical';
-    const lastIndex = path.length - 1;
-
-    path.forEach((pos, index) => {
-        setTimeout(() => {
-            const cell = document.querySelector(`.cell[data-x="${pos.x}"][data-y="${pos.y}"]`);
-            if (!cell) return;
-            cell.classList.add(trailClass);
-            setTimeout(() => cell.classList.remove(trailClass), 600);
-
-            if (index === lastIndex) {
-                setTimeout(() => {
-                    playMissileExplosionEffect(hitX ?? pos.x, hitY ?? pos.y);
-                }, 80);
-            }
-        }, index * 120);
-    });
-}
-
 function activateMissile(player) {
     let x = player.x;
     let y = player.y;
@@ -1902,28 +1949,33 @@ function activateMissile(player) {
         y = (y + dy + gridSize) % gridSize;
         trailPath.push({ x, y });
 
-        if (grid[y][x].type === 'wall' || grid[y][x].type === 'mine' || grid[y][x].type === 'player' || grid[y][x].type === 'crash') {
+        const cell = grid[y][x];
+
+        if (cell.type === 'player') {
             hitX = x;
             hitY = y;
-            const target = grid[y][x];
-            if (target.type === 'player') {
-                const targetPlayer = players[target.playerId];
-                if (!targetPlayer.shield) {
-                    grid[y][x] = { type: "empty", playerId: null };
-                    playFragExplosionEffect(x, y, targetPlayer.color);
-                    eliminatePlayer(targetPlayer.id, player.id);
-                } else {
-                    consumeShield(targetPlayer);
-                }
+            const targetPlayer = players[cell.playerId];
+            if (!targetPlayer.shield) {
+                clearCellAt(x, y);
+                eliminatePlayer(targetPlayer.id, player.id);
             } else {
-                grid[y][x] = { type: "empty", playerId: null };
+                consumeShield(targetPlayer);
             }
+            break;
+        }
+
+        if (cell.type === 'wall' || cell.type === 'mine' || cell.type === 'crash') {
+            hitX = x;
+            hitY = y;
+            clearCellAt(x, y);
             break;
         }
     }
 
-    playMissileLaunchEffect(player.x, player.y);
-    setTimeout(() => playMissileTrail(trailPath, dx, hitX, hitY), 0);
+    setTimeout(() => {
+        playMissileTrail(trailPath, player.dir, player.x, player.y, hitX, hitY);
+        renderGrid();
+    }, 0);
 }
 
 function activateAerobrake(player) {
@@ -1947,7 +1999,7 @@ function activateTeleporter(player) {
     do {
         newX = Math.floor(Math.random() * gridSize);
         newY = Math.floor(Math.random() * gridSize);
-    } while (grid[newY][newX].type !== "empty");
+    } while (!isPassableCell(newX, newY));
 
     playTeleportCellEffect(fromX, fromY);
 
@@ -2111,9 +2163,7 @@ function explodeMine(mineX, mineY) {
                 playFragExplosionEffect(x, y, victim?.color || '#ff5500');
                 eliminatePlayer(cell.playerId, mineOwnerId);
             }
-            if (cell.type !== 'empty') {
-                grid[y][x] = { type: 'empty', playerId: null };
-            }
+            grid[y][x] = { type: 'empty', playerId: null };
         }
     }
 

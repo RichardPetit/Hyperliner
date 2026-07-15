@@ -107,7 +107,41 @@ body {
     }
 
 .crash {
-    /* marqueur logique invisible */
+    overflow: visible;
+}
+
+.crash::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 36px;
+    height: 20px;
+    transform: translate(-50%, -50%);
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+    background: radial-gradient(
+        ellipse at center,
+        color-mix(in srgb, var(--crash-color, #c62828) 85%, #fff 15%) 0%,
+        color-mix(in srgb, var(--crash-color, #c62828) 55%, #000 45%) 40%,
+        transparent 72%
+    );
+    opacity: 0.88;
+    pointer-events: none;
+    z-index: 2;
+}
+
+.crash-on-wall::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    width: 22px;
+    height: 26px;
+    transform: translateX(-50%);
+    background: linear-gradient(160deg, #b8c4d0 0%, #8898a8 45%, #6a7888 100%);
+    clip-path: polygon(50% 0%, 92% 22%, 92% 72%, 50% 100%, 8% 72%, 8% 22%);
+    pointer-events: none;
+    z-index: 1;
 }
 
 #side-panel {
@@ -1328,35 +1362,20 @@ body {
             color: #b0b0b0;
         }
 
-.disabled-power { background-color: #6a6a6a; color: #b0b0b0; cursor: not-allowed; }
-
-
-/* Trait du missile */
-.missile-trail-horizontal::after,
-.missile-trail-vertical::after {
-    content: '';
+.missile-sprite {
     position: absolute;
+    width: 34px;
+    height: 34px;
+    transform: translate(-50%, -65%);
     pointer-events: none;
-    z-index: 15;
-    background-color: #ff2222;
-    box-shadow: 0 0 4px #ff0000, 0 0 8px #ff4444;
+    z-index: 90;
+    object-fit: contain;
+    image-rendering: pixelated;
+    filter: drop-shadow(0 0 4px rgba(255, 80, 0, 0.85));
+    transition: left 0.09s linear, top 0.09s linear;
 }
 
-.missile-trail-horizontal::after {
-    top: 50%;
-    left: 0;
-    width: 100%;
-    height: 3px;
-    transform: translateY(-50%);
-}
-
-.missile-trail-vertical::after {
-    left: 50%;
-    top: 0;
-    width: 3px;
-    height: 100%;
-    transform: translateX(-50%);
-}
+.disabled-power { background-color: #6a6a6a; color: #b0b0b0; cursor: not-allowed; }
 
 
 .mine-wall.mine-pending::after,
