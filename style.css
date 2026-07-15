@@ -21,27 +21,28 @@ body {
     align-items: center;
 }
 
-#game-container {
-    position: relative;
-    overflow: visible;
+#game-board {
     margin-top: 20px;
-    display: grid;
-    grid-template-columns: repeat(22, 24px);
-    grid-template-rows: repeat(22, 24px);
-    gap: 2px;
-    background: #E0E0E0; /* Gris clair pour la grille */
-    padding: 10px;
+    padding: 18px 24px 28px;
+    background: #54697d;
     border-radius: 14px;
     box-shadow: 0 0 24px #4F0341aa;
 }
 
-.cell {
+#game-container {
     position: relative;
-    width: 24px;
-    height: 24px;
-    background: #F2F2F2; /* Gris encore plus clair pour les cases */
-    border-radius: 4px;
-    transition: background 0.2s;
+    overflow: visible;
+    margin: 0 auto;
+}
+
+.cell {
+    position: absolute;
+    width: 40px;
+    height: 20px;
+    margin-left: -20px;
+    margin-top: -10px;
+    background: url('assets/grid/tile.png') center / contain no-repeat;
+    transition: filter 0.2s;
 }
 
 
@@ -51,11 +52,26 @@ body {
 }
 
 .player {
-    background: #7FFFD4; /* Vert d'eau */
+    overflow: visible;
+    background: transparent;
 }
 
 .wall {
-    background: #888; /* Gris fonc� pour les murs */
+    overflow: visible;
+    background: none !important;
+}
+
+.wall::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    width: 22px;
+    height: 26px;
+    transform: translateX(-50%);
+    background: linear-gradient(160deg, #b8c4d0 0%, #8898a8 45%, #6a7888 100%);
+    clip-path: polygon(50% 0%, 92% 22%, 92% 72%, 50% 100%, 8% 72%, 8% 22%);
+    pointer-events: none;
 }
 
 #controls {
@@ -91,18 +107,7 @@ body {
     }
 
 .crash {
-    position: relative;
-}
-
-.crash-x {
-    color: #000;
-    font-size: 1.5rem;
-    font-weight: bold;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    pointer-events: none;
+    /* marqueur logique invisible */
 }
 
 #side-panel {
@@ -536,12 +541,6 @@ body {
     box-shadow: 0 0 8px rgba(255, 215, 0, 0.25);
 }
 
-.player-inspected {
-    outline: 2px solid #FFD700;
-    outline-offset: -2px;
-    box-shadow: 0 0 10px #FFD700, 0 0 20px rgba(255, 215, 0, 0.5) !important;
-}
-
 .inspect-label {
     font-size: 0.75rem;
     color: #aaa;
@@ -606,43 +605,143 @@ body {
     font-weight: bold;
 }
 
-.vehicle-badge {
-    position: absolute;
-    bottom: 1px;
-    right: 2px;
-    font-family: monospace;
-    font-size: 7px;
-    font-weight: bold;
-    color: #000;
-    background: rgba(255, 255, 255, 0.85);
-    padding: 0 2px;
-    border-radius: 2px;
-    line-height: 1.2;
-    pointer-events: none;
-    z-index: 2;
+/* Sprites 3D extraits du Flash (DefineSprite_261_mcLiner) */
+.player-with-sprite::before {
+    display: none !important;
+}
+
+.player .vehicle-sprite {
+    filter:
+        drop-shadow(0 0 2px rgba(0, 0, 0, 0.95))
+        drop-shadow(0 0 4px var(--player-glow, transparent));
+}
+
+.player-human .vehicle-sprite {
+    filter:
+        drop-shadow(0 0 2px rgba(0, 0, 0, 0.95))
+        drop-shadow(0 0 5px #fff)
+        drop-shadow(0 0 8px var(--player-glow, #fff));
+}
+
+.player-inspected .vehicle-sprite {
+    filter:
+        drop-shadow(0 0 2px rgba(0, 0, 0, 0.95))
+        drop-shadow(0 0 6px #FFD700)
+        drop-shadow(0 0 10px var(--player-glow, #FFD700));
 }
 
 .player-human {
-    outline: 2px solid #fff;
-    outline-offset: -2px;
+    outline: none;
+}
+
+.player-inspected {
+    outline: none;
+    box-shadow: none !important;
 }
 
 .player.shield-active {
-    box-shadow: 0 0 6px #fff, 0 0 12px #00e5ff, 0 0 20px #00e5ff !important;
+    box-shadow: none !important;
+}
+
+.player.shield-active .vehicle-sprite {
+    filter:
+        drop-shadow(0 0 2px rgba(0, 0, 0, 0.95))
+        drop-shadow(0 0 8px #00e5ff)
+        drop-shadow(0 0 14px #00e5ff);
 }
 
 .player.shield-active::after {
+    display: none;
+}
+
+/* --- Frag / collision --- */
+.frag-explosion {
+    position: absolute;
+    pointer-events: none;
+    z-index: 120;
+    width: 52px;
+    height: 52px;
+    transform: translate(-50%, -50%);
+}
+
+.frag-explosion::before,
+.frag-explosion::after {
     content: '';
     position: absolute;
-    top: 2px;
-    left: 2px;
-    right: 2px;
-    bottom: 2px;
-    border: 2px solid #00e5ff;
-    border-radius: 3px;
+    inset: 0;
+    border-radius: 50%;
     pointer-events: none;
-    z-index: 3;
-    box-sizing: border-box;
+}
+
+.frag-explosion::before {
+    background: radial-gradient(circle, #fff 0%, var(--frag-color, #ff6600) 28%, transparent 68%);
+    animation: frag-core-burst 0.65s ease-out forwards;
+}
+
+.frag-explosion::after {
+    background: radial-gradient(circle, transparent 35%, var(--frag-color, #ff6600) 50%, transparent 72%);
+    animation: frag-ring-burst 0.7s ease-out forwards;
+}
+
+.frag-spark {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 4px;
+    height: 4px;
+    margin: -2px 0 0 -2px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 6px var(--frag-color, #ff6600);
+    animation: frag-spark-fly 0.65s ease-out forwards;
+    animation-delay: calc(var(--spark-i, 0) * 0.02s);
+    --spark-angle: calc(var(--spark-i, 0) * 45deg);
+}
+
+@keyframes frag-core-burst {
+    0% { opacity: 0; transform: scale(0.2); }
+    25% { opacity: 1; transform: scale(1.1); }
+    100% { opacity: 0; transform: scale(2.2); }
+}
+
+@keyframes frag-ring-burst {
+    0% { opacity: 0.8; transform: scale(0.4); }
+    60% { opacity: 0.5; transform: scale(1.8); }
+    100% { opacity: 0; transform: scale(2.6); }
+}
+
+@keyframes frag-spark-fly {
+    0% {
+        opacity: 1;
+        transform: rotate(var(--spark-angle)) translateY(0) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: rotate(var(--spark-angle)) translateY(-22px) scale(0.3);
+    }
+}
+
+.vehicle-sprite {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    object-fit: contain;
+    image-rendering: pixelated;
+    pointer-events: none;
+    z-index: 1;
+    transform: translate(-50%, -65%);
+}
+
+.vehicle-choice-sprite {
+    display: block;
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 8px;
+    object-fit: contain;
+    image-rendering: pixelated;
+    filter: drop-shadow(0 0 4px rgba(127, 255, 212, 0.35));
 }
 
 .shield-status {
@@ -656,7 +755,7 @@ body {
     text-align: center;
 }
 
-/* Formes distinctives par v�hicule */
+/* Formes distinctives par véhicule */
 .player.vehicle-snypase::before {
     content: '';
     position: absolute;
@@ -729,7 +828,7 @@ body {
     transform: translate(-50%, -50%);
 }
 
-.player.vehicle-mighty::before {
+.player.vehicle-mightyduck::before {
     content: '?';
     position: absolute;
     top: 50%;
@@ -740,7 +839,12 @@ body {
     line-height: 1;
 }
 
-.player.vehicle-duck::before {
+.player.vehicle-cormoran::before,
+.player.vehicle-firefly::before,
+.player.vehicle-chimera::before,
+.player.vehicle-cougar::before,
+.player.vehicle-eclipse::before,
+.player.vehicle-tomahawk::before {
     content: '';
     position: absolute;
     top: 50%;
@@ -752,7 +856,6 @@ body {
     transform: translate(-50%, -50%);
 }
 
-/* Orientation du marqueur Banshee */
 .player.vehicle-banshee[data-dir="up"]::before {
     transform: translate(-50%, -50%) rotate(0deg);
 }
@@ -766,10 +869,7 @@ body {
     transform: translate(-50%, -50%) rotate(90deg);
 }
 
-.wall-snypase { border-radius: 0; }
-.wall-psionide { border-radius: 50%; }
-.wall-kortex { clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); }
-.wall-banshee { clip-path: polygon(0% 100%, 50% 0%, 100% 100%); }
+/* Murs : carré gris uniforme, halo couleur joueur (pas de forme par véhicule) */
 
 .jammer-hit,
 .power-jammer-hit {

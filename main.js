@@ -19,7 +19,34 @@ const playerColors = [
 const wallShadow = (color) => `0 0 8px 2px ${color}, 0 0 2px #fff`;
 
 
-// Génère la grille
+const ISO_TILE_W = 40;
+const ISO_TILE_H = 20;
+
+function isoCellPosition(x, y) {
+    const offsetX = (gridSize - 1) * (ISO_TILE_W / 2);
+    return {
+        left: (x - y) * (ISO_TILE_W / 2) + offsetX,
+        top: (x + y) * (ISO_TILE_H / 2),
+        zIndex: x + y,
+    };
+}
+
+function layoutIsoGrid() {
+    gameContainer.style.width = `${(gridSize - 1) * ISO_TILE_W + ISO_TILE_W}px`;
+    gameContainer.style.height = `${(gridSize - 1) * ISO_TILE_H + ISO_TILE_H}px`;
+    for (let y = 0; y < gridSize; y++) {
+        for (let x = 0; x < gridSize; x++) {
+            const cell = document.querySelector(`.cell[data-x="${x}"][data-y="${y}"]`);
+            if (!cell) continue;
+            const pos = isoCellPosition(x, y);
+            cell.style.left = `${pos.left}px`;
+            cell.style.top = `${pos.top}px`;
+            cell.style.zIndex = pos.zIndex;
+        }
+    }
+}
+
+// Génère la grille (placement isométrique, comme le Flash original)
 for (let y = 0; y < gridSize; y++) {
     for (let x = 0; x < gridSize; x++) {
         const cell = document.createElement('div');
@@ -29,6 +56,7 @@ for (let y = 0; y < gridSize; y++) {
         gameContainer.appendChild(cell);
     }
 }
+layoutIsoGrid();
 
 function updateGridState() {
     // Réinitialise la grille à vide
@@ -79,43 +107,46 @@ function renderGrid() {
             cell.className = 'cell';
             cell.style.background = '';
             cell.style.boxShadow = '';
+            cell.style.filter = '';
             cell.innerHTML = '';
+            const pos = isoCellPosition(x, y);
+            cell.style.left = `${pos.left}px`;
+            cell.style.top = `${pos.top}px`;
+            cell.style.zIndex = pos.zIndex;
 
             const cellState = grid[y][x];
             if (cellState.type === 'player') {
                 const player = players[cellState.playerId];
                 const vehicle = VEHICLES[player.vehicleId];
-                cell.classList.add('player', `vehicle-${player.vehicleId}`);
+                cell.classList.add('player', `vehicle-${player.vehicleId}`, 'player-with-sprite');
                 if (player.id === HUMAN_PLAYER_ID) cell.classList.add('player-human');
                 if (player.id === inspectedPlayerId) cell.classList.add('player-inspected');
                 if (player.shield) cell.classList.add('shield-active');
                 cell.dataset.dir = player.dir;
-                cell.style.background = player.color;
+                cell.style.setProperty('--player-glow', player.color);
+                cell.style.zIndex = pos.zIndex + gridSize * 2;
                 cell.style.cursor = gameStarted && !gameOver ? 'pointer' : '';
-                cell.innerHTML = `<span class="vehicle-badge">${vehicle.id}</span>`;
-                cell.style.boxShadow = `
-          0 0 8px #fff,
-          0 0 16px ${player.color},
-          0 0 32px ${player.color}
-        `;
+                cell.innerHTML = `
+                    <img class="vehicle-sprite" src="${getGridSpritePath(player.vehicleId, player.dir)}" alt="${vehicle.nom}">`;
                 if (gameStarted && !gameOver) {
                     cell.onclick = () => selectPlayerForInspection(player.id);
                 }
             } else if (cellState.type === 'wall') {
                 const player = players[cellState.playerId];
-                cell.classList.add('wall', `wall-${player.vehicleId}`);
-                cell.style.background = '#888';
+                cell.classList.add('wall');
+                cell.style.zIndex = pos.zIndex + gridSize;
+                cell.style.background = '';
                 cell.style.boxShadow = `0 0 6px 2px ${player.color}`;
+                cell.style.filter = `drop-shadow(0 0 4px ${player.color})`;
             } else if (cellState.type === 'crash') {
-                cell.classList.add('crash');
-                cell.style.background = '#e53935';
-                cell.innerHTML = '<span class="crash-x">✖</span>';
+                /* Marqueur logique éphémère — l'effet visuel est géré par playFragExplosionEffect */
             } else if (cellState.type === 'mine') {
                 const owner = players[cellState.playerId];
-                cell.classList.add('wall', `wall-${owner.vehicleId}`, 'mine-wall');
+                cell.classList.add('wall', 'mine-wall');
                 cell.classList.add(cellState.active ? 'mine-active' : 'mine-pending');
-                cell.style.background = '#888';
+                cell.style.background = '';
                 cell.style.boxShadow = `0 0 6px 2px ${owner.color}`;
+                cell.style.filter = `drop-shadow(0 0 4px ${owner.color})`;
             }
         }
     }
@@ -340,6 +371,7 @@ function initSetupScreen() {
         card.dataset.vehicleId = key;
         const powers = getVehiclePowersSummary(vehicle);
         card.innerHTML = `
+            <img class="vehicle-choice-sprite" src="${getGridSpritePath(key, 'down')}" alt="">
             <span class="vehicle-choice-name">${vehicle.nom}</span>
             <span class="roster-code">${vehicle.id}</span>
             <span class="vehicle-choice-powers">${powers || 'Aucun pouvoir'}</span>`;
@@ -538,6 +570,37 @@ class Vehicle {
 const JAMMER_LATENCE = 4;
 const MINE_DETECTION_RANGE = 2;
 const MINE_EXPLOSION_RADIUS = 4;
+
+/**
+ * Index bike_N dans assets/grid/ (DefineSprite_261_mcLiner, JPEXS).
+ * Numérotation interne Flash — différente des png/bike_N.png de la boutique.
+ */
+const VEHICLE_BIKE_MODEL = {
+    cormoran: 2,
+    banshee: 4,
+    psionide: 8,
+    mightyduck: 3,
+    kortex: 10,
+    snypase: 7,
+    eclipse: 11,
+    chimera: 6,
+    cougar: 3,
+    bison: 6,
+    vulture: 19,
+    firefly: 6,
+    tomahawk: 9,
+};
+
+/** Véhicules avec 4 frames directionnelles (DefineSprite_* / 1–4) */
+const BIKE_HAS_DIRECTIONS = new Set([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 18, 19, 20, 21]);
+
+function getGridSpritePath(vehicleId, dir = 'right') {
+    const bike = VEHICLE_BIKE_MODEL[vehicleId] ?? 11;
+    if (BIKE_HAS_DIRECTIONS.has(bike)) {
+        return `assets/grid/bike_${bike}/${dir}.png`;
+    }
+    return `assets/grid/bike_${bike}.png`;
+}
 
 const POWER_LABELS = {
     shield: 'Bouclier',
@@ -1368,15 +1431,18 @@ function movePlayer(player) {
         if (isBlockingCell(targetType) || targetType === "player" || targetType === "crash") {
             if (targetType === "player") {
                 const otherPlayerId = grid[nextY][nextX].playerId;
+                const hitColor = players[otherPlayerId]?.color || player.color;
                 grid[player.y][player.x] = { type: "wall", playerId: player.id };
-                grid[nextY][nextX] = { type: "crash", playerId: player.id };
+                grid[nextY][nextX] = { type: "empty", playerId: null };
+                playFragExplosionEffect(nextX, nextY, hitColor);
                 eliminatePlayer(otherPlayerId, player.id);
                 eliminatePlayer(player.id);
             } else {
                 const obstacleOwnerId = grid[nextY][nextX].ownerId ?? grid[nextY][nextX].playerId;
                 const killerId = obstacleOwnerId !== player.id ? obstacleOwnerId : null;
                 grid[player.y][player.x] = { type: "wall", playerId: player.id };
-                grid[nextY][nextX] = { type: "crash", playerId: player.id };
+                grid[nextY][nextX] = { type: "empty", playerId: null };
+                playFragExplosionEffect(nextX, nextY, player.color);
                 eliminatePlayer(player.id, killerId);
             }
 
@@ -1591,6 +1657,29 @@ function activatePower(player, powerKey) {
 
 function getCellElement(x, y) {
     return document.querySelector(`.cell[data-x="${x}"][data-y="${y}"]`);
+}
+
+const FRAG_EXPLOSION_MS = 700;
+
+function playFragExplosionEffect(x, y, color = '#ff6600') {
+    const pos = getCellCenterInContainer(x, y);
+    if (!pos) return;
+
+    const burst = document.createElement('div');
+    burst.className = 'frag-explosion';
+    burst.style.left = `${pos.x}px`;
+    burst.style.top = `${pos.y - 12}px`;
+    burst.style.setProperty('--frag-color', color);
+
+    for (let i = 0; i < 8; i++) {
+        const spark = document.createElement('span');
+        spark.className = 'frag-spark';
+        spark.style.setProperty('--spark-i', String(i));
+        burst.appendChild(spark);
+    }
+
+    pos.container.appendChild(burst);
+    setTimeout(() => burst.remove(), FRAG_EXPLOSION_MS);
 }
 
 function getCellCenterInContainer(x, y) {
@@ -1820,7 +1909,8 @@ function activateMissile(player) {
             if (target.type === 'player') {
                 const targetPlayer = players[target.playerId];
                 if (!targetPlayer.shield) {
-                    grid[y][x] = { type: "crash", playerId: null };
+                    grid[y][x] = { type: "empty", playerId: null };
+                    playFragExplosionEffect(x, y, targetPlayer.color);
                     eliminatePlayer(targetPlayer.id, player.id);
                 } else {
                     consumeShield(targetPlayer);
@@ -2017,6 +2107,8 @@ function explodeMine(mineX, mineY) {
 
             const cell = grid[y][x];
             if (cell.type === 'player') {
+                const victim = players[cell.playerId];
+                playFragExplosionEffect(x, y, victim?.color || '#ff5500');
                 eliminatePlayer(cell.playerId, mineOwnerId);
             }
             if (cell.type !== 'empty') {
